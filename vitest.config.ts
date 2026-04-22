@@ -21,6 +21,7 @@ export default defineConfig({
     globals: true,
     setupFiles: ["./src/test/setup.ts"],
     css: false,
+    exclude: ["node_modules", "dist", "out", "e2e"],
     env: {
       VITE_PUBLIC_SUPABASE_URL: "https://test.supabase.co",
       VITE_PUBLIC_SUPABASE_ANON_KEY: "test-anon-key",

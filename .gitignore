@@ -46,3 +46,8 @@ auto-imports.d.ts
 # Supabase local
 supabase/.branches/
 supabase/.temp/
+
+# Playwright
+/playwright-report/
+/test-results/
+/playwright/.cache/
