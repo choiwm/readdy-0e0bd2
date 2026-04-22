@@ -1,4 +1,21 @@
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
+import { requireAdmin, AuthFailure } from '../_shared/auth.ts';
+
+// 허용되는 식별자 문자만 통과 — SQL 문자열 보간에 사용되는 값 검증
+const SAFE_IDENT = /^[a-z0-9_-]{1,64}$/i;
+function assertSafeIdent(value: string, name: string): void {
+  if (!SAFE_IDENT.test(value)) {
+    throw new Error(`Invalid ${name}: must match ${SAFE_IDENT}`);
+  }
+}
+
+// cron 표현식은 숫자/공백/기호만 허용
+const SAFE_CRON = /^[0-9*/,\s-]{1,128}$/;
+function assertSafeCron(value: string): void {
+  if (!SAFE_CRON.test(value)) {
+    throw new Error('Invalid cron expression');
+  }
+}
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -50,19 +67,30 @@ function intervalToCron(intervalMin: number): string {
 
 // 헬스체크 Edge Function 호출 SQL 명령
 function buildHealthcheckCommand(supabaseUrl: string, anonKey: string, slug?: string): string {
+  if (slug) assertSafeIdent(slug, 'slug');
   const url = slug
     ? `${supabaseUrl}/functions/v1/healthcheck-scheduler?action=run&slug=${slug}`
     : `${supabaseUrl}/functions/v1/healthcheck-scheduler?action=run`;
 
+  // SCHEDULER_SECRET 환경변수를 pg_cron에서 전달 — 함수 측 requireSchedulerSecret 와 일치해야 함
+  const schedSecret = Deno.env.get('SCHEDULER_SECRET') ?? '';
+
   return `SELECT net.http_post(
     url := '${url}',
-    headers := '{"Authorization": "Bearer ${anonKey}", "Content-Type": "application/json"}'::jsonb,
+    headers := '{"Authorization": "Bearer ${anonKey}", "Content-Type": "application/json", "x-scheduler-secret": "${schedSecret.replace(/'/g, "''")}"}'::jsonb,
     body := '{}'::jsonb
   );`;
 }
 
 Deno.serve(async (req) => {
   if (req.method === 'OPTIONS') return new Response('ok', { headers: corsHeaders });
+
+  try {
+    await requireAdmin(req);
+  } catch (e) {
+    if (e instanceof AuthFailure) return e.response;
+    throw e;
+  }
 
   const supabaseUrl = Deno.env.get('SUPABASE_URL')!;
   const serviceRoleKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
@@ -207,7 +235,15 @@ Deno.serve(async (req) => {
       const { jobname, interval_min, schedule, slug, enabled = true } = body;
       if (!jobname) return err('jobname required');
 
+      try {
+        assertSafeIdent(jobname, 'jobname');
+        if (slug) assertSafeIdent(slug, 'slug');
+      } catch (validationErr) {
+        return err((validationErr as Error).message);
+      }
+
       const cronExpr = schedule ?? (interval_min ? intervalToCron(interval_min) : '0 * * * *');
+      try { assertSafeCron(cronExpr); } catch { return err('Invalid schedule'); }
       const command = buildHealthcheckCommand(supabaseUrl, anonKey, slug);
 
       // cron.schedule() 호출 — service_role로 직접 SQL 실행
@@ -282,6 +318,7 @@ Deno.serve(async (req) => {
       try { body = await req.json(); } catch { return err('Invalid JSON body'); }
       const { jobname } = body;
       if (!jobname) return err('jobname required');
+      try { assertSafeIdent(jobname, 'jobname'); } catch (e) { return err((e as Error).message); }
 
       const { error: rpcErr } = await supabase.rpc('delete_cron_job', { p_jobname: jobname });
 
@@ -305,6 +342,7 @@ Deno.serve(async (req) => {
       try { body = await req.json(); } catch { return err('Invalid JSON body'); }
       const { jobname, active } = body;
       if (!jobname || active === undefined) return err('jobname and active required');
+      try { assertSafeIdent(jobname, 'jobname'); } catch (e) { return err((e as Error).message); }
 
       const { error: rpcErr } = await supabase.rpc('toggle_cron_job', {
         p_jobname: jobname,

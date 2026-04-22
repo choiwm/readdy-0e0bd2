@@ -1,4 +1,5 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
+import { requireUser, AuthFailure } from '../_shared/auth.ts';
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -17,6 +18,13 @@ interface SfxScene {
 serve(async (req) => {
   if (req.method === "OPTIONS") {
     return new Response("ok", { headers: corsHeaders });
+  }
+
+  try {
+    await requireUser(req);
+  } catch (e) {
+    if (e instanceof AuthFailure) return e.response;
+    throw e;
   }
 
   try {

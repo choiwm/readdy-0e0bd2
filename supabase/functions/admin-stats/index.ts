@@ -1,4 +1,5 @@
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
+import { requireAdmin, AuthFailure } from '../_shared/auth.ts';
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -57,6 +58,14 @@ Deno.serve(async (req) => {
     } catch (e) {
       return json({ is_admin: false, reason: 'exception', detail: String(e) });
     }
+  }
+
+  // 그 외 모든 액션은 관리자만 호출 가능
+  try {
+    await requireAdmin(req);
+  } catch (e) {
+    if (e instanceof AuthFailure) return e.response;
+    throw e;
   }
 
   try {

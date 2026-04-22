@@ -2,6 +2,27 @@
 
 감사 일자: 2026-04-22. 대상: `supabase/functions/` 하의 30개 함수.
 
+## 상태 (2026-04-22 기준 코드 반영)
+
+**CRITICAL / HIGH 항목은 모두 커밋으로 패치됨.** 배포 전 다음을 수행하세요:
+
+1. Supabase Edge Functions에 `_shared/` 디렉토리 동기화
+2. `SCHEDULER_SECRET` 환경변수 설정 (`healthcheck-scheduler` + pg_cron 양쪽에 동일 값)
+3. pg_cron 잡 재등록 (`cron-manager?action=upsert_job` — 이제 헤더에 `x-scheduler-secret` 포함됨)
+4. 스테이징에서 회귀 테스트 (관리자 페이지, 생성 기능, 결제 알림)
+
+## 적용된 변경 요약
+
+- `_shared/auth.ts`: `requireUser`, `requireAdmin`, `requireSchedulerSecret`, `AuthFailure`, `writeAuditLog`
+- 9개 `admin-*` 함수 → `requireAdmin` 적용 (admin-stats의 `check_admin` 액션만 예외)
+- 9개 `generate-*` 함수 → `requireUser` + `user_id`를 JWT에서 추출하여 본문 값 대체
+- `cron-manager` → `requireAdmin` + `slug`/`jobname`/`cronExpr` 화이트리스트
+- `healthcheck-scheduler` → `requireSchedulerSecret` 우선, 실패 시 `requireAdmin` 폴백
+- `fal-key-manager`, `test-fal-key`, `fal-model-catalog` → `requireAdmin`
+- `check-fal-status`, `clean-audio`, `analyze-video-sfx`, `summarize-text`, `translate-text` → `requireUser`
+- `credit-alert-email`, `credit-alert-notify` → `requireUser` + `body.user_id` 일치 확인
+- `clean-audio` SSRF 오진 (외부 URL 입력 없음 — 파일 업로드만 수용)
+
 ## 배경
 
 `.env`의 `VITE_PUBLIC_SUPABASE_ANON_KEY`는 브라우저 번들에 포함되어 공개됩니다. 따라서 **anon key로 함수를 호출할 수 있다는 사실 자체는 취약점이 아니며, 각 함수 내부의 권한 검증이 유일한 방어선**입니다.

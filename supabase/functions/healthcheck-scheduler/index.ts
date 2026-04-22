@@ -1,4 +1,5 @@
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
+import { requireAdmin, requireSchedulerSecret, AuthFailure } from '../_shared/auth.ts';
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -225,6 +226,20 @@ async function appendTestHistory(supabase: ReturnType<typeof createClient>, slug
 
 Deno.serve(async (req) => {
   if (req.method === 'OPTIONS') return new Response('ok', { headers: corsHeaders });
+
+  // 스케줄러 비밀 헤더 또는 관리자 JWT 둘 중 하나로 인증
+  try {
+    try {
+      requireSchedulerSecret(req);
+    } catch (schedErr) {
+      if (!(schedErr instanceof AuthFailure)) throw schedErr;
+      await requireAdmin(req);
+    }
+  } catch (e) {
+    if (e instanceof AuthFailure) return e.response;
+    throw e;
+  }
+
   const supabaseUrl = Deno.env.get('SUPABASE_URL');
   const serviceRoleKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY');
   if (!supabaseUrl || !serviceRoleKey) return err('Server configuration error', 500);
