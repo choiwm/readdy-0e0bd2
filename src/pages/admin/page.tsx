@@ -26,6 +26,7 @@ import UsersTab from './components/UsersTab';
 import ContentTab from './components/ContentTab';
 import OverviewTab from './components/OverviewTab';
 import AdminSidebar from './components/AdminSidebar';
+import AdminPageHeader from './components/AdminPageHeader';
 import { getAuthorizationHeader } from '@/lib/env';
 
 // ── Types ──────────────────────────────────────────────────────────────────
@@ -1784,51 +1785,13 @@ export default function AdminPage() {
           <div className="px-4 md:px-8 py-6 md:py-8 max-w-7xl mx-auto">
 
             {/* Page Header */}
-            <div className="flex items-center justify-between mb-6 md:mb-8">
-              <div>
-                <h1 className={`text-xl md:text-2xl font-black ${t.text}`}>
-                  {activeTab === 'overview'       && '글로벌 대시보드'}
-                  {activeTab === 'users'          && '사용자 관리'}
-                  {activeTab === 'coin-grant'     && '코인 직접 지급'}
-                  {activeTab === 'grade-settings' && '회원 등급 권한 설정'}
-                  {activeTab === 'content'        && 'AI 콘텐츠 관리'}
-                  {activeTab === 'ai-engine'      && 'AI 엔진 & API 설정'}
-                  {activeTab === 'billing'        && '결제 & 구독 관리'}
-                  {activeTab === 'cs'             && 'CS 티켓 관리'}
-                  {activeTab === 'cs-notice'      && '공지 / FAQ 관리'}
-                  {activeTab === 'audit'          && '감사 로그'}
-                  {activeTab === 'sys-settings'   && '시스템 설정'}
-                  {activeTab === 'security'       && '보안 / 2FA 관리'}
-                </h1>
-                <p className={`${t.textMuted} text-sm mt-1`}>
-                  마지막 업데이트:{' '}
-                  {lastRefreshedAt
-                    ? lastRefreshedAt.toLocaleString('ko-KR', { year: 'numeric', month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit' }).replace(/\. /g, '.').replace(/\.$/, '')
-                    : new Date().toLocaleString('ko-KR', { year: 'numeric', month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit' }).replace(/\. /g, '.').replace(/\.$/, '')}
-                </p>
-              </div>
-              <div className="flex items-center gap-2">
-                <button
-                  onClick={() => handleCsvExport(
-                    activeTab === 'overview' ? '대시보드' :
-                    activeTab === 'users' ? '사용자' :
-                    activeTab === 'billing' ? '결제' :
-                    activeTab === 'audit' ? '감사 로그' : '데이터'
-                  )}
-                  className={`flex items-center gap-1.5 ${t.btnSecondary} text-xs font-semibold px-3 py-2 rounded-xl cursor-pointer transition-colors whitespace-nowrap`}
-                >
-                  <i className="ri-download-line text-xs" />
-                  <span className="hidden sm:inline">CSV 내보내기</span>
-                </button>
-                <button
-                  onClick={handleRefresh}
-                  className="flex items-center gap-1.5 bg-indigo-500 hover:bg-indigo-400 text-white text-xs font-bold px-3 py-2 rounded-xl cursor-pointer transition-colors whitespace-nowrap"
-                >
-                  <i className="ri-refresh-line text-xs" />
-                  <span className="hidden sm:inline">새로고침</span>
-                </button>
-              </div>
-            </div>
+            <AdminPageHeader
+              t={t}
+              activeTab={activeTab}
+              lastRefreshedAt={lastRefreshedAt}
+              onCsvExport={handleCsvExport}
+              onRefresh={handleRefresh}
+            />
 
             {/* ══════════════════════════════════════════════════════════════
                 ① OVERVIEW TAB
