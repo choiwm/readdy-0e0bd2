@@ -70,6 +70,22 @@ export default defineConfig({
   build: {
     sourcemap: true,
     outDir: 'out',
+    chunkSizeWarningLimit: 600,
+    rolldownOptions: {
+      output: {
+        advancedChunks: {
+          groups: [
+            { name: 'vendor-react', test: /[\\/]node_modules[\\/](react|react-dom|react-router|react-router-dom|scheduler)[\\/]/ },
+            { name: 'vendor-supabase', test: /[\\/]node_modules[\\/]@supabase[\\/]/ },
+            { name: 'vendor-charts', test: /[\\/]node_modules[\\/]recharts[\\/]/ },
+            { name: 'vendor-export', test: /[\\/]node_modules[\\/](html2canvas|jspdf)[\\/]/ },
+            { name: 'vendor-dnd', test: /[\\/]node_modules[\\/]@dnd-kit[\\/]/ },
+            { name: 'vendor-i18n', test: /[\\/]node_modules[\\/](i18next|react-i18next|i18next-browser-languagedetector)[\\/]/ },
+            { name: 'vendor-icons', test: /[\\/]node_modules[\\/]lucide-react[\\/]/ },
+          ],
+        },
+      },
+    },
   },
   resolve: {
     alias: {

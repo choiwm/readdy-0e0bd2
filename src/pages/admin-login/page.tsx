@@ -1,9 +1,8 @@
 import { useState, useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { supabase } from '@/lib/supabase';
+import { SUPABASE_URL, SUPABASE_ANON_KEY } from '@/lib/env';
 
-const SUPABASE_URL = import.meta.env.VITE_PUBLIC_SUPABASE_URL;
-const SUPABASE_ANON_KEY = import.meta.env.VITE_PUBLIC_SUPABASE_ANON_KEY;
 const STORAGE_KEY = 'sb-session';
 const TIMEOUT_MS = 10000;
 
@@ -49,7 +48,7 @@ async function checkAdminViaEdge(accessToken: string): Promise<boolean> {
           headers: {
             Authorization: `Bearer ${accessToken}`,
             'Content-Type': 'application/json',
-            apikey: SUPABASE_ANON_KEY ?? '',
+            apikey: SUPABASE_ANON_KEY,
           },
         }
       ),

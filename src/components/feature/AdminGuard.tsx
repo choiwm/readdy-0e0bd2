@@ -1,6 +1,7 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { supabase } from '@/lib/supabase';
+import { SUPABASE_URL, SUPABASE_ANON_KEY } from '@/lib/env';
 import { logError } from '@/utils/errorHandler';
 
 interface AdminGuardProps {
@@ -8,9 +9,6 @@ interface AdminGuardProps {
 }
 
 type AuthState = 'checking' | 'authorized' | 'unauthorized';
-
-const SUPABASE_URL = import.meta.env.VITE_PUBLIC_SUPABASE_URL;
-const SUPABASE_ANON_KEY = import.meta.env.VITE_PUBLIC_SUPABASE_ANON_KEY;
 const STORAGE_KEY = 'sb-session';
 const TIMEOUT_MS = 15000;
 const REVALIDATE_MS = 5 * 60 * 1000; // 5분마다 서버 재검증
@@ -92,7 +90,7 @@ export default function AdminGuard({ children }: AdminGuardProps) {
         headers: {
           Authorization: `Bearer ${accessToken}`,
           'Content-Type': 'application/json',
-          apikey: SUPABASE_ANON_KEY ?? '',
+          apikey: SUPABASE_ANON_KEY,
         },
         signal,
       });

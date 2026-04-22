@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect } from 'react';
 import jsPDF from 'jspdf';
 import PageHeader from '@/components/feature/PageHeader';
 

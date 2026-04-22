@@ -136,7 +136,7 @@ async function convertImage(
 
       if (cropMode === 'crop') {
         // 센터 크롭: 타겟 비율로 꽉 채우고 넘치는 부분 잘라냄
-        let drawW: number, drawH: number, sx: number, sy: number, sw: number, sh: number;
+        let sx: number, sy: number, sw: number, sh: number;
         if (srcRatio > tgtRatio) {
           // 원본이 더 넓음 → 높이 맞추고 좌우 크롭
           sh = srcH;
@@ -150,8 +150,8 @@ async function convertImage(
           sx = 0;
           sy = (srcH - sh) / 2;
         }
-        drawW = targetW;
-        drawH = targetH;
+        const drawW = targetW;
+        const drawH = targetH;
         ctx.drawImage(img, sx, sy, sw, sh, 0, 0, drawW, drawH);
       } else {
         // 레터박스: 원본 비율 유지 + 검정 여백

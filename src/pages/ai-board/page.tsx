@@ -1,7 +1,6 @@
 import { useState, useRef, useEffect, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import AppNavbar from '@/components/feature/AppNavbar';
-import PageHeader from '@/components/feature/PageHeader';
 import ExportModal from './components/ExportModal';
 import SidebarContent from './components/SidebarContent';
 import ConfirmModal from '@/components/base/ConfirmModal';
@@ -11,6 +10,7 @@ import SfxPickerModal from '@/components/feature/SfxPickerModal';
 import { useSfxStore, useSfxStoreListener, SfxItem } from '@/hooks/useSfxStore';
 import { useCredits as useGlobalCredits } from '@/hooks/useCredits';
 import { useAuth } from '@/hooks/useAuth';
+import { SUPABASE_URL } from '@/lib/env';
 
 import {
   DndContext, closestCenter, PointerSensor, TouchSensor, KeyboardSensor,
@@ -626,8 +626,7 @@ export default function AIBoardPage() {
     progressTimers.current[id] = timer;
     try {
       const cur = shotsRef.current.find((s) => s.id === id);
-      const supabaseUrl = import.meta.env.VITE_PUBLIC_SUPABASE_URL as string;
-      const fnUrl = `${supabaseUrl}/functions/v1/generate-image`;
+      const fnUrl = `${SUPABASE_URL}/functions/v1/generate-image`;
       const imgUrl = await generateShotImage(cur?.prompt ?? '', cur?.shotType ?? 'Wide Shot', aspectRatio, model, fnUrl);
       clearInterval(timer);
       delete progressTimers.current[id];

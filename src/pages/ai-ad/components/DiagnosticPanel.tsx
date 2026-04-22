@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { SUPABASE_URL, SUPABASE_ANON_KEY } from '@/lib/env';
 
 interface DiagResult {
   step: string;
@@ -23,9 +24,6 @@ interface FalPollCheckResult {
   used_status_url?: string;
   error_diagnosis?: string;
 }
-
-const SUPABASE_URL = import.meta.env.VITE_PUBLIC_SUPABASE_URL as string;
-const SUPABASE_ANON_KEY = import.meta.env.VITE_PUBLIC_SUPABASE_ANON_KEY as string;
 
 // 최근 영상 request_id — usage_logs에서 가져와야 하지만 DiagnosticPanel은 독립적이므로
 // check-fal-status Edge Function을 직접 호출해 특정 request_id 상태 확인

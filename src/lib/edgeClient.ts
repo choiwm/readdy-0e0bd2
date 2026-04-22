@@ -1,8 +1,6 @@
 import { supabase } from './supabase';
+import { SUPABASE_URL, SUPABASE_ANON_KEY as ANON_KEY } from './env';
 import { logError } from '@/utils/errorHandler';
-
-const SUPABASE_URL = import.meta.env.VITE_PUBLIC_SUPABASE_URL;
-const ANON_KEY = import.meta.env.VITE_PUBLIC_SUPABASE_ANON_KEY;
 
 export interface CallEdgeOptions {
   method?: 'GET' | 'POST' | 'PUT' | 'PATCH' | 'DELETE';
@@ -42,10 +40,10 @@ async function getAuthHeader(): Promise<Record<string, string>> {
     const { data: { session } } = await supabase.auth.getSession();
     return session?.access_token
       ? { Authorization: `Bearer ${session.access_token}` }
-      : { Authorization: `Bearer ${ANON_KEY ?? ''}` };
+      : { Authorization: `Bearer ${ANON_KEY}` };
   } catch (err) {
     logError(err, { where: 'edgeClient.getAuthHeader' }, 'warn');
-    return { Authorization: `Bearer ${ANON_KEY ?? ''}` };
+    return { Authorization: `Bearer ${ANON_KEY}` };
   }
 }
 
@@ -93,7 +91,7 @@ export async function callEdge<T = unknown>(fn: string, options: CallEdgeOptions
         method,
         headers: {
           'Content-Type': 'application/json',
-          apikey: ANON_KEY ?? '',
+          apikey: ANON_KEY,
           ...authHeaders,
           ...extraHeaders,
         },

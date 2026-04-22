@@ -6,6 +6,7 @@ import PageHeader from '@/components/feature/PageHeader';
 import SidebarCredits from '@/pages/ai-sound/components/SidebarCredits';
 import SidebarUpgrade from '@/pages/ai-sound/components/SidebarUpgrade';
 import { supabase } from '@/lib/supabase';
+import { SUPABASE_URL } from '@/lib/env';
 import { dispatchSfxAdded } from '@/hooks/useSfxStore';
 import { ErrorBanner, useApiError } from '@/components/base/ErrorBanner';
 import { uploadAudioToStorage } from '@/hooks/useAudioHistory';
@@ -389,8 +390,7 @@ export default function EffectsPanel({
       const headers: Record<string, string> = { 'Content-Type': 'application/json' };
       if (session?.access_token) headers['Authorization'] = `Bearer ${session.access_token}`;
 
-      const supabaseUrl = import.meta.env.VITE_PUBLIC_SUPABASE_URL as string;
-      const res = await fetch(`${supabaseUrl}/functions/v1/generate-sfx`, {
+      const res = await fetch(`${SUPABASE_URL}/functions/v1/generate-sfx`, {
         method: 'POST',
         headers,
         body: JSON.stringify({
