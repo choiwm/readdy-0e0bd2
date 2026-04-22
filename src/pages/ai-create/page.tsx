@@ -1,4 +1,4 @@
-import { useState, useCallback, useRef, useEffect } from 'react';
+import { useState, useCallback, useRef, useEffect, useReducer } from 'react';
 import { useSearchParams } from 'react-router-dom';
 
 import AICreateSidebar from './components/Sidebar';
@@ -26,6 +26,32 @@ interface GenerationInfo {
   creditCost: number;
 }
 
+interface GenerationState {
+  view: ViewState;
+  info: GenerationInfo | null;
+  key: number;
+}
+
+type GenerationAction =
+  | { type: 'start'; info: GenerationInfo }
+  | { type: 'complete' }
+  | { type: 'cancel' };
+
+function generationReducer(state: GenerationState, action: GenerationAction): GenerationState {
+  switch (action.type) {
+    case 'start':
+      return { view: 'generating', info: action.info, key: state.key + 1 };
+    case 'complete':
+      return { ...state, view: 'gallery' };
+    case 'cancel':
+      return { ...state, view: 'gallery', info: null };
+    default:
+      return state;
+  }
+}
+
+const INITIAL_GENERATION: GenerationState = { view: 'gallery', info: null, key: 0 };
+
 export interface AppliedCharacter {
   id: string;
   name: string;
@@ -47,10 +73,9 @@ function getSessionId(): string {
 
 export default function AICreatePage() {
   const [searchParams, setSearchParams] = useSearchParams();
-  const [viewState, setViewState] = useState<ViewState>('gallery');
-  const [generationInfo, setGenerationInfo] = useState<GenerationInfo | null>(null);
+  const [generation, dispatchGeneration] = useReducer(generationReducer, INITIAL_GENERATION);
+  const { view: viewState, info: generationInfo, key: generationKey } = generation;
   const generationInfoRef = useRef<GenerationInfo | null>(null);
-  const [generationKey, setGenerationKey] = useState(0);
   const [activeTab, setActiveTab] = useState<SidebarTab>('생성');
   const [appliedCharacter, setAppliedCharacter] = useState<AppliedCharacter | null>(null);
   const [activeCharCategory, setActiveCharCategory] = useState<string>('전체');
@@ -76,9 +101,7 @@ export default function AICreatePage() {
   const handleGenerate = useCallback((prompt: string, model: string, type: string, ratio?: string, creditCost?: number) => {
     const info = { prompt, model, type, ratio: ratio ?? '1K · 16:9 · PNG', creditCost: creditCost ?? 1 };
     generationInfoRef.current = info;
-    setGenerationInfo(info);
-    setGenerationKey((k) => k + 1);
-    setViewState('generating');
+    dispatchGeneration({ type: 'start', info });
   }, []);
 
   // resultType: 'image' | 'video' — GenerationStatus에서 전달
@@ -117,12 +140,11 @@ export default function AICreatePage() {
         setGeneratedItems((prev) => [fallback, ...prev]);
       }
     }
-    setViewState('gallery');
+    dispatchGeneration({ type: 'complete' });
   }, []); // ref에서 읽으므로 의존성 불필요
 
   const handleGenerationCancel = useCallback(() => {
-    setViewState('gallery');
-    setGenerationInfo(null);
+    dispatchGeneration({ type: 'cancel' });
   }, []);
 
   // 취소 시 크레딧 환불
