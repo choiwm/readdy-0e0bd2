@@ -1,0 +1,168 @@
+export type ProjectStatus = 'completed' | 'generating' | 'failed' | 'draft';
+
+export interface AutomationProject {
+  id: string;
+  title: string;
+  topic: string;
+  status: ProjectStatus;
+  progress?: number;
+  duration: number;
+  ratio: string;
+  style: string;
+  createdAt: string;
+  thumbnail: string;
+  videoUrl?: string;
+  views: number;
+  likes: number;
+  model: string;
+  mode: 'AutoPilot' | 'Manual';
+  cuts: number;
+}
+
+export const automationProjects: AutomationProject[] = [
+  {
+    id: 'p1',
+    title: '2024 AI 트렌드 완벽 정리',
+    topic: '인공지능 기술 트렌드와 미래 전망',
+    status: 'completed',
+    duration: 62,
+    ratio: '9:16',
+    style: '미래도시',
+    createdAt: '2026-04-08T14:32:00Z',
+    thumbnail: 'https://readdy.ai/api/search-image?query=futuristic%20AI%20technology%20concept%20with%20glowing%20neural%20networks%20and%20digital%20data%20streams%20on%20dark%20background%2C%20cinematic%204K%20quality%2C%20vibrant%20neon%20colors&width=360&height=640&seq=ap1&orientation=portrait',
+    views: 12480,
+    likes: 843,
+    model: 'Seedance 2.0',
+    mode: 'AutoPilot',
+    cuts: 14,
+  },
+  {
+    id: 'p2',
+    title: '제주도 여행 브이로그 자동 편집',
+    topic: '제주도 3박4일 여행 하이라이트',
+    status: 'completed',
+    duration: 88,
+    ratio: '16:9',
+    style: '자연풍경',
+    createdAt: '2026-04-07T09:15:00Z',
+    thumbnail: 'https://readdy.ai/api/search-image?query=Jeju%20Island%20scenic%20landscape%20with%20volcanic%20rocks%20and%20turquoise%20ocean%2C%20golden%20hour%20photography%2C%20lush%20green%20fields%20and%20traditional%20stone%20walls&width=640&height=360&seq=ap2&orientation=landscape',
+    views: 8920,
+    likes: 612,
+    model: 'Wan 2.1',
+    mode: 'AutoPilot',
+    cuts: 19,
+  },
+  {
+    id: 'p3',
+    title: '홈트레이닝 루틴 가이드',
+    topic: '집에서 할 수 있는 30분 전신 운동',
+    status: 'completed',
+    duration: 55,
+    ratio: '9:16',
+    style: '미니멀',
+    createdAt: '2026-04-06T18:44:00Z',
+    thumbnail: 'https://readdy.ai/api/search-image?query=minimalist%20home%20workout%20fitness%20concept%20with%20clean%20white%20studio%20background%2C%20athletic%20person%20doing%20exercises%2C%20bright%20natural%20lighting%20and%20modern%20aesthetic&width=360&height=640&seq=ap3&orientation=portrait',
+    views: 5340,
+    likes: 389,
+    model: 'Seedance 2.0',
+    mode: 'Manual',
+    cuts: 11,
+  },
+  {
+    id: 'p4',
+    title: '맛집 리뷰 - 성수동 카페 투어',
+    topic: '서울 성수동 핫플레이스 카페 5곳',
+    status: 'generating',
+    progress: 67,
+    duration: 72,
+    ratio: '9:16',
+    style: '미니멀',
+    createdAt: '2026-04-09T11:20:00Z',
+    thumbnail: 'https://readdy.ai/api/search-image?query=trendy%20Seoul%20cafe%20interior%20with%20specialty%20coffee%20and%20aesthetic%20food%20photography%2C%20warm%20ambient%20lighting%2C%20modern%20industrial%20design%20with%20plants&width=360&height=640&seq=ap4&orientation=portrait',
+    views: 0,
+    likes: 0,
+    model: 'Seedance 2.0',
+    mode: 'AutoPilot',
+    cuts: 16,
+  },
+  {
+    id: 'p5',
+    title: '주식 투자 초보 가이드',
+    topic: '2024 주식 시장 분석과 투자 전략',
+    status: 'completed',
+    duration: 91,
+    ratio: '16:9',
+    style: '미래도시',
+    createdAt: '2026-04-05T20:10:00Z',
+    thumbnail: 'https://readdy.ai/api/search-image?query=stock%20market%20financial%20data%20visualization%20with%20glowing%20charts%20and%20graphs%20on%20dark%20background%2C%20trading%20terminal%20screens%2C%20professional%20finance%20concept&width=640&height=360&seq=ap5&orientation=landscape',
+    views: 21300,
+    likes: 1540,
+    model: 'Wan 2.1',
+    mode: 'AutoPilot',
+    cuts: 20,
+  },
+  {
+    id: 'p6',
+    title: '강아지 훈련 팁 TOP 10',
+    topic: '반려견 기초 훈련 방법과 노하우',
+    status: 'completed',
+    duration: 48,
+    ratio: '9:16',
+    style: '자연풍경',
+    createdAt: '2026-04-04T13:55:00Z',
+    thumbnail: 'https://readdy.ai/api/search-image?query=adorable%20golden%20retriever%20puppy%20training%20in%20sunny%20park%20with%20green%20grass%2C%20happy%20dog%20learning%20commands%2C%20warm%20natural%20daylight%20photography&width=360&height=640&seq=ap6&orientation=portrait',
+    views: 9870,
+    likes: 724,
+    model: 'Seedance 2.0',
+    mode: 'Manual',
+    cuts: 10,
+  },
+  {
+    id: 'p7',
+    title: '미니멀 인테리어 DIY',
+    topic: '작은 방을 넓어 보이게 만드는 인테리어 팁',
+    status: 'failed',
+    duration: 65,
+    ratio: '16:9',
+    style: '미니멀',
+    createdAt: '2026-04-03T16:30:00Z',
+    thumbnail: 'https://readdy.ai/api/search-image?query=minimalist%20modern%20bedroom%20interior%20design%20with%20white%20walls%20and%20natural%20wood%20furniture%2C%20clean%20Scandinavian%20aesthetic%2C%20soft%20natural%20lighting&width=640&height=360&seq=ap7&orientation=landscape',
+    views: 0,
+    likes: 0,
+    model: 'Wan 2.1',
+    mode: 'Manual',
+    cuts: 13,
+  },
+  {
+    id: 'p8',
+    title: '파이썬 코딩 입문 강의',
+    topic: '비전공자를 위한 파이썬 기초 완전 정복',
+    status: 'completed',
+    duration: 95,
+    ratio: '16:9',
+    style: '미래도시',
+    createdAt: '2026-04-02T10:00:00Z',
+    thumbnail: 'https://readdy.ai/api/search-image?query=Python%20programming%20code%20on%20dark%20terminal%20screen%20with%20colorful%20syntax%20highlighting%2C%20developer%20workspace%20with%20multiple%20monitors%2C%20tech%20education%20concept&width=640&height=360&seq=ap8&orientation=landscape',
+    views: 34200,
+    likes: 2890,
+    model: 'Seedance 2.0',
+    mode: 'AutoPilot',
+    cuts: 22,
+  },
+  {
+    id: 'p9',
+    title: '봄 패션 코디 추천',
+    topic: '2026 봄 트렌드 패션 스타일링',
+    status: 'draft',
+    duration: 60,
+    ratio: '9:16',
+    style: '미니멀',
+    createdAt: '2026-04-09T08:00:00Z',
+    thumbnail: 'https://readdy.ai/api/search-image?query=spring%20fashion%20lookbook%20with%20pastel%20colored%20outfits%20on%20clean%20white%20background%2C%20stylish%20model%20in%20trendy%20clothes%2C%20bright%20airy%20photography&width=360&height=640&seq=ap9&orientation=portrait',
+    views: 0,
+    likes: 0,
+    model: 'Seedance 2.0',
+    mode: 'Manual',
+    cuts: 12,
+  },
+];

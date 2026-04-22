@@ -1,0 +1,148 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* ─── Scrollbar gutter — 스크롤바 유무에 관계없이 레이아웃 고정 ── */
+html {
+  scrollbar-gutter: stable;
+}
+
+@keyframes slideUp {
+  from {
+    opacity: 0;
+    transform: translateY(20px) scale(0.95);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
+@keyframes starParticle {
+  0% {
+    transform: translate(0, 0) scale(1.2);
+    opacity: 1;
+  }
+  70% {
+    opacity: 0.8;
+    transform: translate(var(--ptx), var(--pty)) scale(0.8);
+  }
+  100% {
+    transform: translate(var(--ptx), var(--pty)) scale(0);
+    opacity: 0;
+  }
+}
+
+/* ─── Indeterminate progress bar animation ─────────────────────── */
+@keyframes indeterminate {
+  0% {
+    transform: translateX(-100%);
+    width: 50%;
+  }
+  50% {
+    width: 70%;
+  }
+  100% {
+    transform: translateX(250%);
+    width: 50%;
+  }
+}
+
+/* ─── Custom Scrollbar ─────────────────────────────────────────── */
+
+/* Firefox */
+* {
+  scrollbar-width: thin;
+  scrollbar-color: #4b4b4b #1a1a1a;
+}
+
+/* WebKit (Chrome, Safari, Edge) */
+::-webkit-scrollbar {
+  width: 14px;
+  height: 14px;
+}
+
+::-webkit-scrollbar-track {
+  background: #1a1a1a;
+  border-radius: 0;
+}
+
+::-webkit-scrollbar-thumb {
+  background: #4b4b4b;
+  border-radius: 3px;
+  border: 2px solid #1a1a1a;
+  min-height: 40px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: #636363;
+}
+
+::-webkit-scrollbar-thumb:active {
+  background: #7a7a7a;
+}
+
+/* Arrow buttons */
+::-webkit-scrollbar-button {
+  background: #1a1a1a;
+  display: block;
+  width: 14px;
+  height: 14px;
+}
+
+/* Up arrow */
+::-webkit-scrollbar-button:vertical:decrement {
+  background-color: #1a1a1a;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='10' viewBox='0 0 10 10'%3E%3Cpolygon points='5,2 9,8 1,8' fill='%23888888'/%3E%3C/svg%3E");
+  background-repeat: no-repeat;
+  background-position: center;
+  background-size: 8px 8px;
+}
+
+::-webkit-scrollbar-button:vertical:decrement:hover {
+  background-color: #2a2a2a;
+}
+
+/* Down arrow */
+::-webkit-scrollbar-button:vertical:increment {
+  background-color: #1a1a1a;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='10' viewBox='0 0 10 10'%3E%3Cpolygon points='5,8 9,2 1,2' fill='%23888888'/%3E%3C/svg%3E");
+  background-repeat: no-repeat;
+  background-position: center;
+  background-size: 8px 8px;
+}
+
+::-webkit-scrollbar-button:vertical:increment:hover {
+  background-color: #2a2a2a;
+}
+
+/* Left arrow */
+::-webkit-scrollbar-button:horizontal:decrement {
+  background-color: #1a1a1a;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='10' viewBox='0 0 10 10'%3E%3Cpolygon points='2,5 8,1 8,9' fill='%23888888'/%3E%3C/svg%3E");
+  background-repeat: no-repeat;
+  background-position: center;
+  background-size: 8px 8px;
+}
+
+::-webkit-scrollbar-button:horizontal:decrement:hover {
+  background-color: #2a2a2a;
+}
+
+/* Right arrow */
+::-webkit-scrollbar-button:horizontal:increment {
+  background-color: #1a1a1a;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='10' viewBox='0 0 10 10'%3E%3Cpolygon points='8,5 2,1 2,9' fill='%23888888'/%3E%3C/svg%3E");
+  background-repeat: no-repeat;
+  background-position: center;
+  background-size: 8px 8px;
+}
+
+::-webkit-scrollbar-button:horizontal:increment:hover {
+  background-color: #2a2a2a;
+}
+
+/* Corner piece */
+::-webkit-scrollbar-corner {
+  background: #1a1a1a;
+}

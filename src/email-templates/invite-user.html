@@ -1,0 +1,260 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>초대장 - AiMetaWOW</title>
+  <style>
+    @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap');
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body {
+      font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+      background-color: #09090b;
+      color: #ffffff;
+      -webkit-font-smoothing: antialiased;
+    }
+    .wrapper { max-width: 560px; margin: 0 auto; padding: 40px 20px; }
+    .card {
+      background: linear-gradient(145deg, #111113 0%, #0f0f12 100%);
+      border: 1px solid rgba(255,255,255,0.07);
+      border-radius: 24px;
+      overflow: hidden;
+    }
+    /* Special gradient hero for invite */
+    .hero {
+      background: linear-gradient(135deg, #0d0a1a 0%, #0a0d1a 50%, #0a1a0d 100%);
+      padding: 48px 40px 40px;
+      text-align: center;
+      position: relative;
+    }
+    .hero::before {
+      content: '';
+      position: absolute;
+      top: 0; left: 0; right: 0; bottom: 0;
+      background: radial-gradient(ellipse at 50% 0%, rgba(99,102,241,0.18) 0%, transparent 60%),
+                  radial-gradient(ellipse at 80% 80%, rgba(139,92,246,0.1) 0%, transparent 50%);
+    }
+    /* Decorative stars */
+    .stars {
+      position: absolute;
+      top: 20px; left: 0; right: 0;
+      font-size: 12px;
+      color: rgba(255,255,255,0.15);
+      letter-spacing: 20px;
+      text-align: center;
+    }
+    .logo-wrap {
+      display: inline-flex;
+      align-items: center;
+      gap: 10px;
+      margin-bottom: 32px;
+      position: relative;
+    }
+    .logo-icon {
+      width: 36px;
+      height: 36px;
+      background: linear-gradient(135deg, #6366f1, #8b5cf6);
+      border-radius: 10px;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 18px;
+    }
+    .logo-text { font-size: 18px; font-weight: 900; color: #ffffff; letter-spacing: -0.5px; }
+    .icon-circle {
+      width: 80px;
+      height: 80px;
+      background: linear-gradient(135deg, rgba(99,102,241,0.2), rgba(139,92,246,0.2));
+      border: 1px solid rgba(99,102,241,0.3);
+      border-radius: 50%;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      margin-bottom: 24px;
+      position: relative;
+      font-size: 36px;
+    }
+    .invite-badge {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      background: linear-gradient(135deg, rgba(99,102,241,0.2), rgba(139,92,246,0.2));
+      border: 1px solid rgba(99,102,241,0.3);
+      border-radius: 100px;
+      padding: 5px 14px;
+      margin-bottom: 16px;
+      position: relative;
+    }
+    .invite-badge-dot { width: 6px; height: 6px; background: #6366f1; border-radius: 50%; }
+    .invite-badge-text { font-size: 11px; font-weight: 800; color: #818cf8; letter-spacing: 0.05em; }
+    .hero-title { font-size: 28px; font-weight: 900; color: #ffffff; letter-spacing: -0.5px; margin-bottom: 10px; position: relative; }
+    .hero-sub { font-size: 14px; color: #a1a1aa; line-height: 1.6; position: relative; }
+    .body { padding: 36px 40px; }
+    .greeting { font-size: 15px; color: #d4d4d8; margin-bottom: 16px; line-height: 1.6; }
+    .desc { font-size: 14px; color: #a1a1aa; line-height: 1.7; margin-bottom: 28px; }
+    /* Feature list */
+    .features {
+      background: rgba(99,102,241,0.05);
+      border: 1px solid rgba(99,102,241,0.12);
+      border-radius: 16px;
+      padding: 20px;
+      margin-bottom: 28px;
+    }
+    .features-title { font-size: 11px; font-weight: 800; color: #6366f1; text-transform: uppercase; letter-spacing: 0.1em; margin-bottom: 14px; }
+    .feature-row { display: flex; align-items: center; gap: 12px; margin-bottom: 12px; }
+    .feature-row:last-child { margin-bottom: 0; }
+    .feature-icon {
+      width: 32px;
+      height: 32px;
+      background: rgba(99,102,241,0.1);
+      border-radius: 8px;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 16px;
+      flex-shrink: 0;
+    }
+    .feature-text { font-size: 13px; color: #d4d4d8; font-weight: 500; }
+    .feature-sub { font-size: 11px; color: #71717a; margin-top: 1px; }
+    .btn-wrap { text-align: center; margin-bottom: 32px; }
+    .btn {
+      display: inline-block;
+      background: linear-gradient(135deg, #6366f1, #8b5cf6);
+      color: #ffffff !important;
+      text-decoration: none;
+      font-size: 15px;
+      font-weight: 800;
+      padding: 16px 44px;
+      border-radius: 14px;
+      letter-spacing: -0.2px;
+    }
+    .link-fallback {
+      background: rgba(255,255,255,0.03);
+      border: 1px solid rgba(255,255,255,0.06);
+      border-radius: 12px;
+      padding: 14px 16px;
+      margin-bottom: 28px;
+    }
+    .link-fallback-label { font-size: 11px; color: #71717a; margin-bottom: 6px; }
+    .link-fallback-url { font-size: 11px; color: #6366f1; word-break: break-all; line-height: 1.5; }
+    .info-box {
+      background: rgba(255,255,255,0.02);
+      border: 1px solid rgba(255,255,255,0.06);
+      border-radius: 14px;
+      padding: 16px 20px;
+      margin-bottom: 28px;
+    }
+    .info-row { display: flex; align-items: center; gap: 10px; margin-bottom: 8px; }
+    .info-row:last-child { margin-bottom: 0; }
+    .info-dot { width: 6px; height: 6px; background: #6366f1; border-radius: 50%; flex-shrink: 0; }
+    .info-text { font-size: 13px; color: #a1a1aa; }
+    .warning { font-size: 12px; color: #71717a; text-align: center; line-height: 1.6; }
+    .footer {
+      padding: 24px 40px 32px;
+      text-align: center;
+      border-top: 1px solid rgba(255,255,255,0.05);
+    }
+    .footer-links { margin-bottom: 14px; }
+    .footer-links a { color: #71717a; text-decoration: none; font-size: 12px; margin: 0 10px; }
+    .footer-copy { font-size: 11px; color: #52525b; line-height: 1.6; }
+  </style>
+</head>
+<body>
+  <div class="wrapper">
+    <div class="card">
+      <div class="hero">
+        <div class="stars">✦ ✦ ✦ ✦ ✦</div>
+        <div class="logo-wrap">
+          <div class="logo-icon">✦</div>
+          <span class="logo-text">AiMetaWOW</span>
+        </div>
+        <div class="invite-badge">
+          <div class="invite-badge-dot"></div>
+          <span class="invite-badge-text">EXCLUSIVE INVITE</span>
+        </div>
+        <br /><br />
+        <div class="icon-circle">🎉</div>
+        <h1 class="hero-title">초대장이 도착했습니다!</h1>
+        <p class="hero-sub">AiMetaWOW에 초대받으셨습니다.<br />AI 크리에이티브 플랫폼을 지금 바로 시작하세요.</p>
+      </div>
+
+      <div class="body">
+        <p class="greeting">안녕하세요! 🎊</p>
+        <p class="desc">
+          AiMetaWOW에 초대받으셨습니다! AI 이미지 생성, TVC 광고 제작, AI 사운드 등
+          다양한 AI 크리에이티브 도구를 무제한으로 사용해보세요.
+        </p>
+
+        <div class="features">
+          <div class="features-title">✦ AiMetaWOW에서 할 수 있는 것들</div>
+          <div class="feature-row">
+            <div class="feature-icon">🎨</div>
+            <div>
+              <div class="feature-text">AI 이미지 & 캐릭터 생성</div>
+              <div class="feature-sub">텍스트 한 줄로 고품질 이미지 생성</div>
+            </div>
+          </div>
+          <div class="feature-row">
+            <div class="feature-icon">📺</div>
+            <div>
+              <div class="feature-text">TVC 광고 자동 제작</div>
+              <div class="feature-sub">제품 정보만 입력하면 AI가 광고 완성</div>
+            </div>
+          </div>
+          <div class="feature-row">
+            <div class="feature-icon">🎵</div>
+            <div>
+              <div class="feature-text">AI 음악 & 음성 생성</div>
+              <div class="feature-sub">배경음악, TTS, 음향효과 모두 지원</div>
+            </div>
+          </div>
+          <div class="feature-row">
+            <div class="feature-icon">⚡</div>
+            <div>
+              <div class="feature-text">AI 자동화 워크플로우</div>
+              <div class="feature-sub">반복 작업을 AI로 자동화</div>
+            </div>
+          </div>
+        </div>
+
+        <div class="btn-wrap">
+          <a href="{{ .ConfirmationURL }}" class="btn">🎉 지금 시작하기</a>
+        </div>
+
+        <div class="info-box">
+          <div class="info-row">
+            <div class="info-dot"></div>
+            <span class="info-text">이 초대 링크는 <strong style="color:#d4d4d8;">7일</strong> 동안 유효합니다</span>
+          </div>
+          <div class="info-row">
+            <div class="info-dot"></div>
+            <span class="info-text">초대 링크는 1회만 사용 가능합니다</span>
+          </div>
+        </div>
+
+        <div class="link-fallback">
+          <div class="link-fallback-label">버튼이 작동하지 않으면 아래 링크를 복사하세요</div>
+          <div class="link-fallback-url">{{ .ConfirmationURL }}</div>
+        </div>
+
+        <p class="warning">
+          본인이 초대를 원하지 않으신다면 이 이메일을 무시하세요.<br />
+          문의사항이 있으시면 고객 지원에 연락해주세요.
+        </p>
+      </div>
+
+      <div class="footer">
+        <div class="footer-links">
+          <a href="#">서비스 이용약관</a>
+          <a href="#">개인정보처리방침</a>
+          <a href="#">고객 지원</a>
+        </div>
+        <p class="footer-copy">
+          © 2025 AiMetaWOW. All rights reserved.<br />
+          이 이메일은 자동 발송되었으며 회신하실 수 없습니다.
+        </p>
+      </div>
+    </div>
+  </div>
+</body>
+</html>
