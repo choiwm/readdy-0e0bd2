@@ -28,6 +28,7 @@ import OverviewTab from './components/OverviewTab';
 import AdminSidebar from './components/AdminSidebar';
 import AdminPageHeader from './components/AdminPageHeader';
 import { useAdminBilling, PAYMENTS_PAGE_SIZE } from './hooks/useAdminBilling';
+import { useAdminCs } from './hooks/useAdminCs';
 import { getAuthorizationHeader } from '@/lib/env';
 
 // ── Types ──────────────────────────────────────────────────────────────────
@@ -261,15 +262,19 @@ export default function AdminPage() {
   const paymentsTotalPages = paymentsTotalPagesFromHook;
 
   // ── CS State ──
-  const [csTickets, setCsTickets] = useState<CsTicket[]>([]);
-  const [csLoading, setCsLoading] = useState(false);
-  const [noticeList, setNoticeList] = useState<Notice[]>([]);
+  const {
+    csTickets, setCsTickets,
+    csLoading,
+    csTicketStats,
+    noticeList, setNoticeList,
+    loadCsTickets, loadCsTicketStats, loadNotices,
+  } = useAdminCs();
   const [selectedTicket, setSelectedTicket] = useState<CsTicket | null>(null);
   const [editingNotice, setEditingNotice] = useState<Notice | null | 'new'>('new' as const);
   const [noticeEditOpen, setNoticeEditOpen] = useState(false);
   const [pushMailModal, setPushMailModal] = useState<'email' | 'push' | null>(null);
   const [csTicketFilter, setCsTicketFilter] = useState<'all' | 'open' | 'in_progress' | 'resolved' | 'closed'>('all');
-  const [csTicketStats, setCsTicketStats] = useState({ total: 0, open: 0, in_progress: 0, resolved: 0, closed: 0, urgent: 0, high: 0 });
+  // csTicketStats now comes from useAdminCs
 
   // ── AI Engine State ──
   const [promptTemplates, setPromptTemplates] = useState<PromptTemplate[]>([
@@ -313,86 +318,6 @@ export default function AdminPage() {
   const [payments, setPayments] = useState<{ id: string; user: string; plan: string; amount: string; date: string; status: string; method: string }[]>([]);
 
   // ── Handlers ──────────────────────────────────────────────────────────────
-
-  // CS: 티켓 목록 로드 (Edge Function)
-  const loadCsTickets = useCallback(async (statusFilter?: string) => {
-    setCsLoading(true);
-    try {
-      const url = new URL(`${import.meta.env.VITE_PUBLIC_SUPABASE_URL}/functions/v1/admin-cs`);
-      url.searchParams.set('action', 'list_tickets');
-      url.searchParams.set('limit', '50');
-      if (statusFilter && statusFilter !== 'all') url.searchParams.set('status', statusFilter);
-
-      const res = await fetch(url.toString(), {
-        headers: { 'Authorization': getAuthorizationHeader() },
-      });
-      const json = await res.json();
-
-      if (json.tickets && json.tickets.length > 0) {
-        const mapped: CsTicket[] = json.tickets.map((t: Record<string, string>) => ({
-          id:       t.id,
-          user:     t.user_name ?? t.user_email ?? '알 수 없음',
-          subject:  t.title,
-          category: t.category,
-          priority: t.priority,
-          status:   t.status,
-          date:     new Date(t.created_at).toLocaleString('ko-KR').replace(/\. /g, '.').replace(/\.$/, ''),
-        }));
-        setCsTickets(mapped);
-      } else {
-        setCsTickets([]);
-      }
-    } catch (e) {
-      console.warn('CS tickets load failed:', e);
-      setCsTickets([]);
-    } finally {
-      setCsLoading(false);
-    }
-  }, []);
-
-  // CS: 티켓 통계 로드
-  const loadCsTicketStats = useCallback(async () => {
-    try {
-      const url = new URL(`${import.meta.env.VITE_PUBLIC_SUPABASE_URL}/functions/v1/admin-cs`);
-      url.searchParams.set('action', 'ticket_stats');
-      const res = await fetch(url.toString(), {
-        headers: { 'Authorization': getAuthorizationHeader() },
-      });
-      const json = await res.json();
-      if (json.stats) setCsTicketStats(json.stats);
-    } catch (e) {
-      console.warn('CS stats load failed:', e);
-    }
-  }, []);
-
-  // CS: 공지사항 목록 로드
-  const loadNotices = useCallback(async () => {
-    try {
-      const url = new URL(`${import.meta.env.VITE_PUBLIC_SUPABASE_URL}/functions/v1/admin-cs`);
-      url.searchParams.set('action', 'list_notices');
-      url.searchParams.set('limit', '20');
-      const res = await fetch(url.toString(), {
-        headers: { 'Authorization': getAuthorizationHeader() },
-      });
-      const json = await res.json();
-      if (json.notices && json.notices.length > 0) {
-        const mapped: Notice[] = json.notices.map((n: Record<string, string | number | boolean>) => ({
-          id:     n.id as string,
-          title:  n.title as string,
-          type:   n.category as string,
-          status: n.status as string,
-          date:   new Date(n.created_at as string).toISOString().slice(0, 10).replace(/-/g, '.'),
-          views:  n.view_count as number ?? 0,
-        }));
-        setNoticeList(mapped);
-      } else {
-        setNoticeList([]);
-      }
-    } catch (e) {
-      console.warn('Notices load failed:', e);
-      setNoticeList([]);
-    }
-  }, []);
 
   // ── Overview 통계 로드 (전체 병렬 로드) ──
   const loadOverviewStats = useCallback(async () => {
