@@ -41,6 +41,8 @@ function relativeTime(iso: string): string {
 }
 
 // ── Main Component ─────────────────────────────────────────────────────────
+const SLACK_BASE = `${import.meta.env.VITE_PUBLIC_SUPABASE_URL}/functions/v1/healthcheck-scheduler`;
+
 export default function SlackAlertPanel({ isDark, onToast }: Props) {
   const [settings, setSettings] = useState<SlackSettings>({
     enabled: false,
@@ -61,9 +63,6 @@ export default function SlackAlertPanel({ isDark, onToast }: Props) {
   const [hasChanges, setHasChanges] = useState(false);
   const [savedSettings, setSavedSettings] = useState<SlackSettings | null>(null);
 
-  const SUPABASE_URL = import.meta.env.VITE_PUBLIC_SUPABASE_URL;
-    const base = `${SUPABASE_URL}/functions/v1/healthcheck-scheduler`;
-  const headers = { 'Authorization': getAuthorizationHeader() };
 
   const t = {
     cardBg:    isDark ? 'bg-[#0f0f13]'         : 'bg-white',
@@ -79,7 +78,7 @@ export default function SlackAlertPanel({ isDark, onToast }: Props) {
   const loadSettings = useCallback(async () => {
     setLoading(true);
     try {
-      const res = await fetch(`${base}?action=get_slack_settings`, { headers });
+      const res = await fetch(`${SLACK_BASE}?action=get_slack_settings`, { headers: { Authorization: getAuthorizationHeader() } });
       const data = await res.json();
       if (data.settings) {
         setSettings(data.settings);
@@ -128,9 +127,9 @@ export default function SlackAlertPanel({ isDark, onToast }: Props) {
         body.webhook_url = webhookInput;
       }
 
-      const res = await fetch(`${base}?action=update_slack_settings`, {
+      const res = await fetch(`${SLACK_BASE}?action=update_slack_settings`, {
         method: 'PATCH',
-        headers: { ...headers, 'Content-Type': 'application/json' },
+        headers: { Authorization: getAuthorizationHeader(), 'Content-Type': 'application/json' },
         body: JSON.stringify(body),
       });
       const data = await res.json();
@@ -159,9 +158,9 @@ export default function SlackAlertPanel({ isDark, onToast }: Props) {
     }
     setTestSending(true);
     try {
-      const res = await fetch(`${base}?action=send_test_slack`, {
+      const res = await fetch(`${SLACK_BASE}?action=send_test_slack`, {
         method: 'POST',
-        headers: { ...headers, 'Content-Type': 'application/json' },
+        headers: { Authorization: getAuthorizationHeader(), 'Content-Type': 'application/json' },
         body: JSON.stringify({}),
       });
       const data = await res.json();

@@ -290,9 +290,12 @@ export default function SnsExportModal({ url, type, title, originalRatio, onClos
   // 초기 선택
   useEffect(() => {
     setSelectedFormat(platform.formats[0]);
-  }, []);
+  }, [platform.formats]);
 
-  const getFormatKey = (fmt: SnsFormat) => `${selectedPlatform}_${fmt.ratio}_${fmt.label}`;
+  const getFormatKey = useCallback(
+    (fmt: SnsFormat) => `${selectedPlatform}_${fmt.ratio}_${fmt.label}`,
+    [selectedPlatform],
+  );
 
   const isRatioMatch = (fmt: SnsFormat) => fmt.ratio === originalRatio;
 
@@ -335,7 +338,7 @@ export default function SnsExportModal({ url, type, title, originalRatio, onClos
       setDownloadStates((prev) => ({ ...prev, [key]: 'error' }));
       setTimeout(() => setDownloadStates((prev) => ({ ...prev, [key]: 'idle' })), 2500);
     }
-  }, [url, type, title, selectedPlatform, cropMode]);
+  }, [url, type, title, selectedPlatform, cropMode, getFormatKey]);
 
   /** 현재 플랫폼 전체 포맷 일괄 다운로드 */
   const handleBulkDownload = useCallback(async () => {

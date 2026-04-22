@@ -259,7 +259,7 @@ export default function CustomCharacterModal({ onClose, onGenerate }: CustomChar
     } finally {
       setIsGenerating(false);
     }
-  }, [canAfford, deduct, credits, buildCharacterPrompt, profile]);
+  }, [canAfford, deduct, refund, credits, buildCharacterPrompt, profile]);
 
   // ── 다시 생성 ─────────────────────────────────────────────────────────
   const handleRegenerate = useCallback(async () => {
@@ -307,7 +307,7 @@ export default function CustomCharacterModal({ onClose, onGenerate }: CustomChar
     } finally {
       setIsGenerating(false);
     }
-  }, [canAfford, deduct, credits, buildCharacterPrompt, profile]);
+  }, [canAfford, deduct, refund, credits, buildCharacterPrompt, profile]);
 
   const handleApply = () => {
     if (!generatedPreview) return;

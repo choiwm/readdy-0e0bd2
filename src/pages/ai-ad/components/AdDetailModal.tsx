@@ -1,3 +1,4 @@
+/* eslint-disable react-refresh/only-export-components */
 import { useState, useRef, useCallback, useEffect } from 'react';
 import { TvcTemplate } from '@/mocks/tvcSamples';
 import { supabase } from '@/lib/supabase';
@@ -923,7 +924,7 @@ export default function AdDetailModal({ template, productName, productDesc, side
         });
       } catch { /* 무시 */ }
     }
-  }, [genState, credits, deduct, refreshCredits, buildPrompt, clearAllTimers, outputRatio, outputRes, outputFmt, productName, advantage, template, profile, sendGenerationInProgress, completeGenerationNotif, failGenerationNotif, productImages, uploadedUrls]);
+  }, [genState, credits, deduct, refreshCredits, buildPrompt, clearAllTimers, outputRatio, outputRes, outputFmt, productName, advantage, template, profile, sendGenerationInProgress, completeGenerationNotif, failGenerationNotif, productImages, uploadedUrls, onAddToMyWorks]);
 
   const handleReset = useCallback(() => {
     clearAllTimers();

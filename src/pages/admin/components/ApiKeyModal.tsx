@@ -120,7 +120,7 @@ export default function ApiKeyModal({ service, mode, onClose, onSave, isDark }: 
     } finally {
       setSaving(false);
     }
-  }, [isRenew, apiKey, notes, monthlyLimit, slug, service.name, onSave, onClose]);
+  }, [isRenew, apiKey, notes, monthlyLimit, limitAction, notifyThreshold, slug, service.name, onSave, onClose]);
 
   // API 키 연결 테스트 (저장 없이 서버에서 직접 테스트)
   const handleTest = useCallback(async () => {

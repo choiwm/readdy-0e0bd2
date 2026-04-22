@@ -127,6 +127,8 @@ function EmailTagInput({
 }
 
 // ── Main Component ─────────────────────────────────────────────────────────
+const HEALTHCHECK_BASE = `${import.meta.env.VITE_PUBLIC_SUPABASE_URL}/functions/v1/healthcheck-scheduler`;
+
 export default function EmailAlertPanel({ isDark, onToast }: Props) {
   const [settings, setSettings] = useState<EmailSettings>({
     enabled: false,
@@ -144,10 +146,6 @@ export default function EmailAlertPanel({ isDark, onToast }: Props) {
   const [savedSettings, setSavedSettings] = useState<EmailSettings | null>(null);
   const [_resendKeySet, setResendKeySet] = useState<boolean | null>(null);
 
-  const SUPABASE_URL = import.meta.env.VITE_PUBLIC_SUPABASE_URL;
-    const base = `${SUPABASE_URL}/functions/v1/healthcheck-scheduler`;
-  const headers = { 'Authorization': getAuthorizationHeader() };
-
   const t = {
     cardBg:    isDark ? 'bg-[#0f0f13]'         : 'bg-white',
     cardBg2:   isDark ? 'bg-zinc-900/60'        : 'bg-gray-50',
@@ -163,7 +161,7 @@ export default function EmailAlertPanel({ isDark, onToast }: Props) {
   const loadSettings = useCallback(async () => {
     setLoading(true);
     try {
-      const res = await fetch(`${base}?action=get_email_settings`, { headers });
+      const res = await fetch(`${HEALTHCHECK_BASE}?action=get_email_settings`, { headers: { Authorization: getAuthorizationHeader() } });
       const data = await res.json();
       if (data.settings) {
         setSettings(data.settings);
@@ -200,9 +198,9 @@ export default function EmailAlertPanel({ isDark, onToast }: Props) {
     }
     setSaving(true);
     try {
-      const res = await fetch(`${base}?action=update_email_settings`, {
+      const res = await fetch(`${HEALTHCHECK_BASE}?action=update_email_settings`, {
         method: 'PATCH',
-        headers: { ...headers, 'Content-Type': 'application/json' },
+        headers: { Authorization: getAuthorizationHeader(), 'Content-Type': 'application/json' },
         body: JSON.stringify(settings),
       });
       const data = await res.json();
@@ -224,9 +222,9 @@ export default function EmailAlertPanel({ isDark, onToast }: Props) {
     }
     setTestSending(true);
     try {
-      const res = await fetch(`${base}?action=send_test_email`, {
+      const res = await fetch(`${HEALTHCHECK_BASE}?action=send_test_email`, {
         method: 'POST',
-        headers: { ...headers, 'Content-Type': 'application/json' },
+        headers: { Authorization: getAuthorizationHeader(), 'Content-Type': 'application/json' },
         body: JSON.stringify({}),
       });
       const data = await res.json();

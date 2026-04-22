@@ -1,3 +1,4 @@
+/* eslint-disable react-refresh/only-export-components */
 export const GRADE_META: Record<string, { label: string; color: string; bg: string; icon: string }> = {
   general:   { label: '일반',   color: 'text-slate-400',   bg: 'bg-slate-500/15',   icon: 'ri-user-line' },
   staff:     { label: '운영진', color: 'text-violet-400',  bg: 'bg-violet-500/15',  icon: 'ri-shield-star-line' },

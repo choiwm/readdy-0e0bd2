@@ -192,6 +192,8 @@ export default function AICreatePage() {
       setInitialType(typeParam);
       setSearchParams({}, { replace: true });
     }
+    // 초기 1회 실행: searchParams는 의도적으로 변경되면 재실행 안 함
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   useEffect(() => {

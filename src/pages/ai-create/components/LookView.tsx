@@ -294,7 +294,7 @@ export default function LookView({ onApplyLook, appliedLook, onSaveToGallery }: 
       // 실패 시 크레딧 환불
       refund(LOOK_CREDIT_COST);
     }
-  }, [selectedLook, genStep, canAfford, deduct, credits, buildLookPrompt, intensity, sourceImage, preserveSource, onSaveToGallery, profile]);
+  }, [selectedLook, genStep, canAfford, deduct, refund, credits, buildLookPrompt, intensity, sourceImage, preserveSource, onSaveToGallery, profile]);
 
   const handleDownload = async (result: GeneratedResult) => {
     try {

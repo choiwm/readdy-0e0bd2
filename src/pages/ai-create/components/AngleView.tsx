@@ -398,7 +398,7 @@ export default function AngleView({ onApplyAngle, appliedAngle, sharedDraft, onD
       // 실패 시 크레딧 환불
       refund(ANGLE_CREDIT_COST);
     }
-  }, [genStep, canAfford, deduct, credits, buildAnglePrompt, activePreset, pan, tilt, zoom, sourceImage, preserveSource, onSaveToGallery, showSaveToast, profile]);
+  }, [genStep, canAfford, deduct, refund, credits, buildAnglePrompt, activePreset, pan, tilt, zoom, sourceImage, preserveSource, onSaveToGallery, showSaveToast, profile]);
 
   // fetch → blob → objectURL 방식으로 실제 다운로드
   const handleDownload = useCallback(async (result: GeneratedResult) => {

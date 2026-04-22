@@ -535,7 +535,10 @@ export default function AIBoardPage() {
     const h = () => { setShowAspectDropdown(false); setShowCutDropdown(false); setShowModelDropdown(false); setShowResDropdown(false); };
     window.addEventListener('click', h); return () => window.removeEventListener('click', h);
   }, []);
-  useEffect(() => { return () => { Object.values(progressTimers.current).forEach(clearInterval); }; }, []);
+  useEffect(() => {
+    const timers = progressTimers.current;
+    return () => { Object.values(timers).forEach(clearInterval); };
+  }, []);
 
   const showToast = useCallback((message: string, type: 'success' | 'error' | 'info' = 'info') => { setToast({ message, type }); }, []);
 

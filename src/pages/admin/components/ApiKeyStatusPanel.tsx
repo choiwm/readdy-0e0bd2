@@ -137,7 +137,7 @@ function MonthlyUsageGauge({
 
 // ── 한도 설정 인라인 패널 ─────────────────────────────────────────────────────
 function LimitSettingsPanel({
-  keyRecord, isDark, base, headers, onUpdate, onClose,
+  keyRecord, isDark, base: _base, headers, onUpdate, onClose,
 }: {
   keyRecord: ApiKeyRecord;
   isDark: boolean;
@@ -164,7 +164,7 @@ function LimitSettingsPanel({
   const handleSave = async () => {
     setSaving(true);
     try {
-      const res = await fetch(`${base}?action=update_limit_settings`, {
+      const res = await fetch(`${ADMIN_API_KEYS_BASE}?action=update_limit_settings`, {
         method: 'PATCH',
         headers: { ...headers, 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -194,7 +194,7 @@ function LimitSettingsPanel({
   const handleReset = async () => {
     if (!confirm('이 서비스의 월 사용량을 0으로 리셋하고 활성화 상태로 복구할까요?')) return;
     try {
-      await fetch(`${base}?action=reset_monthly_usage`, {
+      await fetch(`${ADMIN_API_KEYS_BASE}?action=reset_monthly_usage`, {
         method: 'POST',
         headers: { ...headers, 'Content-Type': 'application/json' },
         body: JSON.stringify({ service_slug: keyRecord.service_slug }),
@@ -452,7 +452,7 @@ function TestHistoryDropdown({
 type MigrationPhase = 'idle' | 'scanning' | 'scanned' | 'migrating' | 'done' | 'error';
 
 function MigrationBanner({
-  isDark, base, headers, onComplete,
+  isDark, base: _base, headers, onComplete,
 }: {
   isDark: boolean;
   base: string;
@@ -476,7 +476,7 @@ function MigrationBanner({
     setPhase('scanning');
     setErrorMsg('');
     try {
-      const res = await fetch(`${base}?action=scan_legacy`, { headers });
+      const res = await fetch(`${ADMIN_API_KEYS_BASE}?action=scan_legacy`, { headers });
       const data: ScanResult = await res.json();
       setScan(data);
       setPhase('scanned');
@@ -491,7 +491,7 @@ function MigrationBanner({
     setPhase('migrating');
     setErrorMsg('');
     try {
-      const res = await fetch(`${base}?action=migrate_legacy_keys`, {
+      const res = await fetch(`${ADMIN_API_KEYS_BASE}?action=migrate_legacy_keys`, {
         method: 'POST',
         headers: { ...headers, 'Content-Type': 'application/json' },
         body: JSON.stringify({}),
@@ -709,6 +709,8 @@ function LimitExceededBanner({ keys, isDark }: { keys: ApiKeyRecord[]; isDark: b
 }
 
 // ── 메인 패널 ─────────────────────────────────────────────────────────────────
+const ADMIN_API_KEYS_BASE = `${import.meta.env.VITE_PUBLIC_SUPABASE_URL}/functions/v1/admin-api-keys`;
+
 export default function ApiKeyStatusPanel({ isDark, onKeyRenew }: Props) {
   const [apiKeys, setApiKeys] = useState<ApiKeyRecord[]>([]);
   const [usageStats, setUsageStats] = useState<UsageStats>({});
@@ -731,16 +733,13 @@ export default function ApiKeyStatusPanel({ isDark, onKeyRenew }: Props) {
     divider:   isDark ? 'divide-white/[0.03]'   : 'divide-gray-100',
   };
 
-  const SUPABASE_URL = import.meta.env.VITE_PUBLIC_SUPABASE_URL;
-    const headers = { 'Authorization': getAuthorizationHeader() };
-  const base = `${SUPABASE_URL}/functions/v1/admin-api-keys`;
-
   const loadData = useCallback(async () => {
+    const headers = { Authorization: getAuthorizationHeader() };
     setLoading(true);
     try {
       const [keysRes, statsRes] = await Promise.allSettled([
-        fetch(`${base}?action=list`, { headers }),
-        fetch(`${base}?action=usage_stats&days=7`, { headers }),
+        fetch(`${ADMIN_API_KEYS_BASE}?action=list`, { headers }),
+        fetch(`${ADMIN_API_KEYS_BASE}?action=usage_stats&days=7`, { headers }),
       ]);
       if (keysRes.status === 'fulfilled') {
         const data = await keysRes.value.json();
@@ -765,11 +764,12 @@ export default function ApiKeyStatusPanel({ isDark, onKeyRenew }: Props) {
   const exceededCount = apiKeys.filter((k) => k.monthly_limit > 0 && k.monthly_used >= k.monthly_limit).length;
 
   const handleTestSaved = useCallback(async (slug: string) => {
+    const headers = { Authorization: getAuthorizationHeader() };
     // 테스트 시작: 즉시 'testing' 상태로
     setTestStates((prev) => ({ ...prev, [slug]: 'testing' }));
 
     try {
-      const res = await fetch(`${base}?action=test_saved_key`, {
+      const res = await fetch(`${ADMIN_API_KEYS_BASE}?action=test_saved_key`, {
         method: 'POST',
         headers: { ...headers, 'Content-Type': 'application/json' },
         body: JSON.stringify({ service_slug: slug }),
@@ -825,9 +825,9 @@ export default function ApiKeyStatusPanel({ isDark, onKeyRenew }: Props) {
   const handleToggleStatus = async (slug: string, currentStatus: string) => {
     const newStatus = currentStatus === 'active' ? 'inactive' : 'active';
     try {
-      await fetch(`${base}?action=toggle_status`, {
+      await fetch(`${ADMIN_API_KEYS_BASE}?action=toggle_status`, {
         method: 'PATCH',
-        headers: { ...headers, 'Content-Type': 'application/json' },
+        headers: { Authorization: getAuthorizationHeader(), 'Content-Type': 'application/json' },
         body: JSON.stringify({ service_slug: slug, status: newStatus }),
       });
       setApiKeys((prev) => prev.map((k) => k.service_slug === slug ? { ...k, status: newStatus as 'active' | 'inactive' | 'error' } : k));
@@ -898,7 +898,7 @@ export default function ApiKeyStatusPanel({ isDark, onKeyRenew }: Props) {
       <LimitExceededBanner keys={apiKeys} isDark={isDark} />
 
       {/* 마이그레이션 배너 */}
-      <MigrationBanner isDark={isDark} base={base} headers={headers} onComplete={loadData} />
+      <MigrationBanner isDark={isDark} base={ADMIN_API_KEYS_BASE} headers={{ Authorization: getAuthorizationHeader() }} onComplete={loadData} />
 
       {/* API Key List */}
       <div className={`divide-y ${t.divider}`}>
@@ -1085,8 +1085,8 @@ export default function ApiKeyStatusPanel({ isDark, onKeyRenew }: Props) {
                 <LimitSettingsPanel
                   keyRecord={key}
                   isDark={isDark}
-                  base={base}
-                  headers={headers}
+                  base={ADMIN_API_KEYS_BASE}
+                  headers={{ Authorization: getAuthorizationHeader() }}
                   onUpdate={handleKeyUpdate}
                   onClose={() => setOpenLimitSlug(null)}
                 />

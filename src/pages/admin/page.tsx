@@ -498,7 +498,7 @@ export default function AdminPage() {
     } finally {
       setUsersLoading(false);
     }
-  }, []);
+  }, [userGradeFilter]);
 
   // ── User Stats 로드 ──
   const loadUserStats = useCallback(async () => {

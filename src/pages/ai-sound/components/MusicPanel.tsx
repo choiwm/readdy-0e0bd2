@@ -588,7 +588,7 @@ export default function MusicPanel({
       setApiError(err, msg);
       onGenerateCancel(newId);
     }
-  }, [prompt, activeTags, hasVocal, trackDuration, credits, onDeductCredits, onGenerateStart, onGenerateComplete, onGenerateCancel, clearError, setApiError, sendGenerationInProgress, completeGenerationNotif, failGenerationNotif]);
+  }, [prompt, activeTags, hasVocal, trackDuration, onDeductCredits, onGenerateStart, onGenerateComplete, onGenerateCancel, clearError, setApiError, sendGenerationInProgress, completeGenerationNotif, failGenerationNotif, isLoggedIn, profile]);
 
   const handleRetry = useCallback(() => {
     if (lastRequestRef.current) {

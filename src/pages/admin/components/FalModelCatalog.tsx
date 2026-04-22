@@ -264,7 +264,7 @@ export default function FalModelCatalog({ isDark, onToast, onSelectModel }: Prop
   // ── 초기 로드 ──
   useEffect(() => {
     loadAll();
-  }, []);
+  }, [loadAll]);
 
   // ── 필터 변경 시 재로드 ──
   useEffect(() => {
@@ -273,7 +273,7 @@ export default function FalModelCatalog({ isDark, onToast, onSelectModel }: Prop
     } else {
       loadAll();
     }
-  }, [debouncedQ, selectedCategory]);
+  }, [debouncedQ, selectedCategory, loadAll, loadModels]);
 
   // ── 모델을 서비스에 적용 ──
   const handleApplyModel = (model: FalModel) => {
