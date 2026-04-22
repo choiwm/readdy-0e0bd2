@@ -30,6 +30,7 @@ import AdminPageHeader from './components/AdminPageHeader';
 import { useAdminBilling, PAYMENTS_PAGE_SIZE } from './hooks/useAdminBilling';
 import { useAdminCs } from './hooks/useAdminCs';
 import { useAdminAudit } from './hooks/useAdminAudit';
+import { useAdminUsers } from './hooks/useAdminUsers';
 import { getAuthorizationHeader } from '@/lib/env';
 
 // ── Types ──────────────────────────────────────────────────────────────────
@@ -170,13 +171,19 @@ export default function AdminPage() {
   const [activeTab, setActiveTab] = useState<TabType>('overview');
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [isDark, setIsDark] = useState(true);
-  const [userSearch, setUserSearch] = useState('');
-  const [userPlanFilter, setUserPlanFilter] = useState('전체');
-  const [userGradeFilter, setUserGradeFilter] = useState('전체');
+  const {
+    usersData, setUsersData,
+    usersLoading,
+    userStats,
+    userSearch, setUserSearch,
+    userPlanFilter, setUserPlanFilter,
+    userGradeFilter, setUserGradeFilter,
+    userSearchDebounceRef,
+    loadUsers, loadUserStats,
+  } = useAdminUsers();
   const [gradeChangeModal, setGradeChangeModal] = useState<UserRecord | null>(null);
   const [gradeChangeValue, setGradeChangeValue] = useState('general');
   const [gradeChangeReason, setGradeChangeReason] = useState('');
-  const userSearchDebounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const [contentFilter, setContentFilter] = useState('전체');
   const [selectedUser, setSelectedUser] = useState<UserRecord | null>(null);
   const [_revenueRange, _setRevenueRange] = useState<'daily' | 'weekly' | 'monthly'>('monthly');
@@ -201,9 +208,7 @@ export default function AdminPage() {
   }, []);
 
   // ── Real Data State ──
-  const [usersData, setUsersData] = useState<UserRecord[]>([]);
-  const [usersLoading, setUsersLoading] = useState(false);
-  const [userStats, setUserStats] = useState({ total: 0, active: 0, inactive: 0, suspended: 0, free: 0, pro: 0, enterprise: 0 });
+  // usersData/usersLoading/userStats now come from useAdminUsers
   const {
     paymentsData, setPaymentsData,
     paymentsLoading,
@@ -388,65 +393,6 @@ export default function AdminPage() {
       console.warn('Overview stats load failed:', e);
     } finally {
       setOverviewLoading(false);
-    }
-  }, []);
-
-  // ── Users 로드 ──
-  const loadUsers = useCallback(async (search?: string, plan?: string, grade?: string) => {
-    setUsersLoading(true);
-    try {
-      const url = new URL(`${import.meta.env.VITE_PUBLIC_SUPABASE_URL}/functions/v1/admin-users`);
-      url.searchParams.set('action', 'list_users');
-      url.searchParams.set('limit', '50');
-      if (search) url.searchParams.set('search', search);
-      if (plan && plan !== '전체') url.searchParams.set('plan', plan.toLowerCase());
-      const effectiveGrade = grade ?? userGradeFilter;
-      if (effectiveGrade && effectiveGrade !== '전체') url.searchParams.set('grade', effectiveGrade);
-
-      const res = await fetch(url.toString(), {
-        headers: { 'Authorization': getAuthorizationHeader() },
-      });
-      const json = await res.json();
-
-      if (json.users && json.users.length > 0) {
-        const mapped = json.users.map((u: Record<string, unknown>) => ({
-          id: u.id as string,
-          name: (u.display_name as string) ?? (u.email as string)?.split('@')[0] ?? '알 수 없음',
-          email: u.email as string,
-          plan: u.plan ? ((u.plan as string).charAt(0).toUpperCase() + (u.plan as string).slice(1)) : 'Free',
-          credits: (u.credit_balance as number) ?? 0,
-          joined: u.created_at ? new Date(u.created_at as string).toLocaleDateString('ko-KR').replace(/\. /g, '.').replace(/\.$/, '') : '-',
-          status: (u.status as UserStatus) ?? 'active',
-          lastLogin: u.last_login_at ? new Date(u.last_login_at as string).toLocaleString('ko-KR').replace(/\. /g, '.').replace(/\.$/, '') : '-',
-          loginIp: (u.last_login_ip as string) ?? '-',
-          projects: (u.project_count as number) ?? 0,
-          memberGrade: (u.member_grade as string) ?? 'general',
-        }));
-        setUsersData(mapped);
-      } else {
-        // 빈 결과면 빈 배열로 세팅 (목업 절대 표시 안 함)
-        setUsersData([]);
-      }
-    } catch (e) {
-      console.warn('Users load failed:', e);
-      setUsersData([]);
-    } finally {
-      setUsersLoading(false);
-    }
-  }, [userGradeFilter]);
-
-  // ── User Stats 로드 ──
-  const loadUserStats = useCallback(async () => {
-    try {
-      const url = new URL(`${import.meta.env.VITE_PUBLIC_SUPABASE_URL}/functions/v1/admin-users`);
-      url.searchParams.set('action', 'user_stats');
-      const res = await fetch(url.toString(), {
-        headers: { 'Authorization': getAuthorizationHeader() },
-      });
-      const json = await res.json();
-      if (json.stats) setUserStats(json.stats);
-    } catch (e) {
-      console.warn('User stats load failed:', e);
     }
   }, []);
 
