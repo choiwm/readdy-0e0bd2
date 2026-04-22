@@ -1,4 +1,5 @@
 import { useState, useEffect, useCallback } from 'react';
+import { getAuthorizationHeader } from '@/lib/env';
 
 // ── Types ──────────────────────────────────────────────────────────────────
 interface EmailSettings {
@@ -144,9 +145,8 @@ export default function EmailAlertPanel({ isDark, onToast }: Props) {
   const [resendKeySet, setResendKeySet] = useState<boolean | null>(null);
 
   const SUPABASE_URL = import.meta.env.VITE_PUBLIC_SUPABASE_URL;
-  const ANON_KEY = import.meta.env.VITE_PUBLIC_SUPABASE_ANON_KEY;
-  const base = `${SUPABASE_URL}/functions/v1/healthcheck-scheduler`;
-  const headers = { 'Authorization': `Bearer ${ANON_KEY}` };
+    const base = `${SUPABASE_URL}/functions/v1/healthcheck-scheduler`;
+  const headers = { 'Authorization': getAuthorizationHeader() };
 
   const t = {
     cardBg:    isDark ? 'bg-[#0f0f13]'         : 'bg-white',

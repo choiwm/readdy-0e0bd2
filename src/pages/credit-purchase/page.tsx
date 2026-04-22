@@ -2,6 +2,7 @@ import { useState, useEffect, useCallback } from 'react';
 import { Link } from 'react-router-dom';
 import { useCredits } from '@/hooks/useCredits';
 import { useAuth } from '@/hooks/useAuth';
+import { getAuthorizationHeader } from '@/lib/env';
 
 const CREDIT_PACKAGES = [
   {
@@ -123,7 +124,7 @@ function useCreditAlertSettings(userId: string | null) {
     try {
       const res = await fetch(
         `${import.meta.env.VITE_PUBLIC_SUPABASE_URL}/functions/v1/credit-alert-notify?action=get_settings&user_id=${userId}`,
-        { headers: { 'Authorization': `Bearer ${import.meta.env.VITE_PUBLIC_SUPABASE_ANON_KEY}` } }
+        { headers: { 'Authorization': getAuthorizationHeader() } }
       );
       const data = await res.json();
       if (data.settings) {
@@ -143,7 +144,7 @@ function useCreditAlertSettings(userId: string | null) {
         {
           method: 'POST',
           headers: {
-            'Authorization': `Bearer ${import.meta.env.VITE_PUBLIC_SUPABASE_ANON_KEY}`,
+            'Authorization': getAuthorizationHeader(),
             'Content-Type': 'application/json',
           },
           body: JSON.stringify({ user_id: userId, ...settings }),

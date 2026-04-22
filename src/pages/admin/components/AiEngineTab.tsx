@@ -6,6 +6,7 @@ import HealthCheckScheduler from './HealthCheckScheduler';
 import FailureLogsDrawer from './FailureLogsDrawer';
 import FalModelCatalog from './FalModelCatalog';
 import FalKeyManagerPanel from './FalKeyManagerPanel';
+import { getAuthorizationHeader } from '@/lib/env';
 
 // ── Types ──────────────────────────────────────────────────────────────────
 interface ApiKeyRecord {
@@ -264,7 +265,7 @@ export default function AiEngineTab({
     setModelLoading(true);
     try {
       const base = `${import.meta.env.VITE_PUBLIC_SUPABASE_URL}/functions/v1/admin-api-keys`;
-      const headers = { 'Authorization': `Bearer ${import.meta.env.VITE_PUBLIC_SUPABASE_ANON_KEY}` };
+      const headers = { 'Authorization': getAuthorizationHeader() };
       const [settingsRes, keysRes] = await Promise.allSettled([
         fetch(`${base}?action=get_model_settings`, { headers }),
         fetch(`${base}?action=list`, { headers }),
@@ -310,7 +311,7 @@ export default function AiEngineTab({
     setKeysLoading(true);
     try {
       const base = `${import.meta.env.VITE_PUBLIC_SUPABASE_URL}/functions/v1/admin-api-keys`;
-      const headers = { 'Authorization': `Bearer ${import.meta.env.VITE_PUBLIC_SUPABASE_ANON_KEY}` };
+      const headers = { 'Authorization': getAuthorizationHeader() };
       const [keysRes, statsRes] = await Promise.allSettled([
         fetch(`${base}?action=list`, { headers }),
         fetch(`${base}?action=usage_stats&days=7`, { headers }),
@@ -368,7 +369,7 @@ export default function AiEngineTab({
     setModelSaveSuccess(null);
     try {
       const base = `${import.meta.env.VITE_PUBLIC_SUPABASE_URL}/functions/v1/admin-api-keys`;
-      const headers = { 'Authorization': `Bearer ${import.meta.env.VITE_PUBLIC_SUPABASE_ANON_KEY}`, 'Content-Type': 'application/json' };
+      const headers = { 'Authorization': getAuthorizationHeader(), 'Content-Type': 'application/json' };
       let settingsToSave: Record<string, string> = {};
 
       if (category === 'image') {
@@ -423,7 +424,7 @@ export default function AiEngineTab({
         `${import.meta.env.VITE_PUBLIC_SUPABASE_URL}/functions/v1/admin-api-keys?action=toggle_status`,
         {
           method: 'PATCH',
-          headers: { 'Authorization': `Bearer ${import.meta.env.VITE_PUBLIC_SUPABASE_ANON_KEY}`, 'Content-Type': 'application/json' },
+          headers: { 'Authorization': getAuthorizationHeader(), 'Content-Type': 'application/json' },
           body: JSON.stringify({ service_slug: slug, status: newStatus }),
         }
       );
@@ -449,7 +450,7 @@ export default function AiEngineTab({
         `${import.meta.env.VITE_PUBLIC_SUPABASE_URL}/functions/v1/admin-api-keys?action=test_saved_key`,
         {
           method: 'POST',
-          headers: { 'Authorization': `Bearer ${import.meta.env.VITE_PUBLIC_SUPABASE_ANON_KEY}`, 'Content-Type': 'application/json' },
+          headers: { 'Authorization': getAuthorizationHeader(), 'Content-Type': 'application/json' },
           body: JSON.stringify({ service_slug: slug }),
         }
       );

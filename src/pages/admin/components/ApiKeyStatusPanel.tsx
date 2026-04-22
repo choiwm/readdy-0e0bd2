@@ -1,4 +1,5 @@
 import { useState, useEffect, useCallback } from 'react';
+import { getAuthorizationHeader } from '@/lib/env';
 
 interface TestHistoryEntry {
   tested_at: string;
@@ -731,8 +732,7 @@ export default function ApiKeyStatusPanel({ isDark, onKeyRenew }: Props) {
   };
 
   const SUPABASE_URL = import.meta.env.VITE_PUBLIC_SUPABASE_URL;
-  const ANON_KEY = import.meta.env.VITE_PUBLIC_SUPABASE_ANON_KEY;
-  const headers = { 'Authorization': `Bearer ${ANON_KEY}` };
+    const headers = { 'Authorization': getAuthorizationHeader() };
   const base = `${SUPABASE_URL}/functions/v1/admin-api-keys`;
 
   const loadData = useCallback(async () => {

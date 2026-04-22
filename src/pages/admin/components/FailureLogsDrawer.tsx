@@ -1,4 +1,5 @@
 import { useState, useEffect, useCallback } from 'react';
+import { getAuthorizationHeader } from '@/lib/env';
 
 // ── Types ──────────────────────────────────────────────────────────────────
 interface FailureLog {
@@ -301,7 +302,7 @@ export default function FailureLogsDrawer({ isDark, isOpen, onClose, initialSlug
     setLoading(true);
     try {
       const base = `${import.meta.env.VITE_PUBLIC_SUPABASE_URL}/functions/v1/admin-api-keys`;
-      const headers = { 'Authorization': `Bearer ${import.meta.env.VITE_PUBLIC_SUPABASE_ANON_KEY}` };
+      const headers = { 'Authorization': getAuthorizationHeader() };
       const params = new URLSearchParams({ action: 'failed_logs', days: String(days), limit: '100', status: 'failed' });
       if (slug) params.set('slug', slug);
       const res = await fetch(`${base}?${params}`, { headers });

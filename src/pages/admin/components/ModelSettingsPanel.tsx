@@ -1,4 +1,5 @@
 import { useState, useEffect, useCallback } from 'react';
+import { getAuthorizationHeader } from '@/lib/env';
 
 interface ModelSettings {
   image: {
@@ -111,7 +112,7 @@ export default function ModelSettingsPanel({ isDark, onSave }: Props) {
     setLoading(true);
     try {
       const base = `${import.meta.env.VITE_PUBLIC_SUPABASE_URL}/functions/v1/admin-api-keys`;
-      const headers = { 'Authorization': `Bearer ${import.meta.env.VITE_PUBLIC_SUPABASE_ANON_KEY}` };
+      const headers = { 'Authorization': getAuthorizationHeader() };
 
       const [settingsRes, keysRes] = await Promise.allSettled([
         fetch(`${base}?action=get_model_settings`, { headers }),
@@ -168,7 +169,7 @@ export default function ModelSettingsPanel({ isDark, onSave }: Props) {
     try {
       const base = `${import.meta.env.VITE_PUBLIC_SUPABASE_URL}/functions/v1/admin-api-keys`;
       const headers = {
-        'Authorization': `Bearer ${import.meta.env.VITE_PUBLIC_SUPABASE_ANON_KEY}`,
+        'Authorization': getAuthorizationHeader(),
         'Content-Type': 'application/json',
       };
 

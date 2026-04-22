@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { SUPABASE_URL, SUPABASE_ANON_KEY } from '@/lib/env';
+import { SUPABASE_URL, SUPABASE_ANON_KEY, getAuthorizationHeader } from '@/lib/env';
 
 interface DiagResult {
   step: string;
@@ -63,7 +63,7 @@ export default function DiagnosticPanel({ onClose }: { onClose: () => void }) {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
-          'Authorization': `Bearer ${SUPABASE_ANON_KEY}`,
+          'Authorization': getAuthorizationHeader(),
         },
         body: JSON.stringify({ 
           request_id: requestId, 

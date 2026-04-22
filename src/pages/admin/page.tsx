@@ -16,6 +16,7 @@ import { apiStatus, contentTrends, dailySignups, planDist, auditLogs } from './m
 import { StatusBadge, PlanBadge, PriorityBadge } from './components/Badges';
 import GradePermissionsPanel from './components/GradePermissionsPanel';
 import NotificationPanel, { type Notification, initialNotifications } from './components/NotificationPanel';
+import { getAuthorizationHeader } from '@/lib/env';
 
 // ── Types ──────────────────────────────────────────────────────────────────
 type TabType = 'overview' | 'users' | 'coin-grant' | 'content' | 'ai-engine' | 'billing' | 'cs' | 'cs-notice' | 'audit' | 'sys-settings' | 'security' | 'grade-settings';
@@ -367,7 +368,7 @@ export default function AdminPage() {
       if (statusFilter && statusFilter !== 'all') url.searchParams.set('status', statusFilter);
 
       const res = await fetch(url.toString(), {
-        headers: { 'Authorization': `Bearer ${import.meta.env.VITE_PUBLIC_SUPABASE_ANON_KEY}` },
+        headers: { 'Authorization': getAuthorizationHeader() },
       });
       const json = await res.json();
 
@@ -399,7 +400,7 @@ export default function AdminPage() {
       const url = new URL(`${import.meta.env.VITE_PUBLIC_SUPABASE_URL}/functions/v1/admin-cs`);
       url.searchParams.set('action', 'ticket_stats');
       const res = await fetch(url.toString(), {
-        headers: { 'Authorization': `Bearer ${import.meta.env.VITE_PUBLIC_SUPABASE_ANON_KEY}` },
+        headers: { 'Authorization': getAuthorizationHeader() },
       });
       const json = await res.json();
       if (json.stats) setCsTicketStats(json.stats);
@@ -415,7 +416,7 @@ export default function AdminPage() {
       url.searchParams.set('action', 'list_notices');
       url.searchParams.set('limit', '20');
       const res = await fetch(url.toString(), {
-        headers: { 'Authorization': `Bearer ${import.meta.env.VITE_PUBLIC_SUPABASE_ANON_KEY}` },
+        headers: { 'Authorization': getAuthorizationHeader() },
       });
       const json = await res.json();
       if (json.notices && json.notices.length > 0) {
@@ -442,7 +443,7 @@ export default function AdminPage() {
     setOverviewLoading(true);
     try {
       const base = `${import.meta.env.VITE_PUBLIC_SUPABASE_URL}/functions/v1/admin-stats`;
-      const headers = { 'Authorization': `Bearer ${import.meta.env.VITE_PUBLIC_SUPABASE_ANON_KEY}` };
+      const headers = { 'Authorization': getAuthorizationHeader() };
 
       const [overviewRes, dailyRes, planRes, trendsRes, monthlyRes, auditRes] = await Promise.allSettled([
         fetch(`${base}?action=overview`, { headers }),
@@ -517,7 +518,7 @@ export default function AdminPage() {
       if (userGradeFilter && userGradeFilter !== '전체') url.searchParams.set('grade', userGradeFilter);
 
       const res = await fetch(url.toString(), {
-        headers: { 'Authorization': `Bearer ${import.meta.env.VITE_PUBLIC_SUPABASE_ANON_KEY}` },
+        headers: { 'Authorization': getAuthorizationHeader() },
       });
       const json = await res.json();
 
@@ -554,7 +555,7 @@ export default function AdminPage() {
       const url = new URL(`${import.meta.env.VITE_PUBLIC_SUPABASE_URL}/functions/v1/admin-users`);
       url.searchParams.set('action', 'user_stats');
       const res = await fetch(url.toString(), {
-        headers: { 'Authorization': `Bearer ${import.meta.env.VITE_PUBLIC_SUPABASE_ANON_KEY}` },
+        headers: { 'Authorization': getAuthorizationHeader() },
       });
       const json = await res.json();
       if (json.stats) setUserStats(json.stats);
@@ -572,7 +573,7 @@ export default function AdminPage() {
       fetchUrl.searchParams.set('limit', String(PAYMENTS_PAGE_SIZE));
       fetchUrl.searchParams.set('page', String(page));
       const res = await fetch(fetchUrl.toString(), {
-        headers: { 'Authorization': `Bearer ${import.meta.env.VITE_PUBLIC_SUPABASE_ANON_KEY}` },
+        headers: { 'Authorization': getAuthorizationHeader() },
       });
       const data = await res.json();
       if (data.payments && data.payments.length > 0) {
@@ -610,7 +611,7 @@ export default function AdminPage() {
       const url = new URL(`${import.meta.env.VITE_PUBLIC_SUPABASE_URL}/functions/v1/admin-billing`);
       url.searchParams.set('action', 'payment_stats');
       const res = await fetch(url.toString(), {
-        headers: { 'Authorization': `Bearer ${import.meta.env.VITE_PUBLIC_SUPABASE_ANON_KEY}` },
+        headers: { 'Authorization': getAuthorizationHeader() },
       });
       const json = await res.json();
       if (json.stats) setPaymentStats(json.stats);
@@ -625,7 +626,7 @@ export default function AdminPage() {
       const url = new URL(`${import.meta.env.VITE_PUBLIC_SUPABASE_URL}/functions/v1/admin-billing`);
       url.searchParams.set('action', 'list_coupons');
       const res = await fetch(url.toString(), {
-        headers: { 'Authorization': `Bearer ${import.meta.env.VITE_PUBLIC_SUPABASE_ANON_KEY}` },
+        headers: { 'Authorization': getAuthorizationHeader() },
       });
       const json = await res.json();
       if (json.coupons && json.coupons.length > 0) {
@@ -682,7 +683,7 @@ export default function AdminPage() {
       }
 
       const res = await fetch(fetchUrl.toString(), {
-        headers: { 'Authorization': `Bearer ${import.meta.env.VITE_PUBLIC_SUPABASE_ANON_KEY}` },
+        headers: { 'Authorization': getAuthorizationHeader() },
       });
       const json = await res.json();
       if (json.logs && json.logs.length > 0) {
@@ -714,7 +715,7 @@ export default function AdminPage() {
       const url = new URL(`${import.meta.env.VITE_PUBLIC_SUPABASE_URL}/functions/v1/admin-audit`);
       url.searchParams.set('action', 'log_stats');
       const res = await fetch(url.toString(), {
-        headers: { 'Authorization': `Bearer ${import.meta.env.VITE_PUBLIC_SUPABASE_ANON_KEY}` },
+        headers: { 'Authorization': getAuthorizationHeader() },
       });
       const json = await res.json();
       if (json.stats) setAuditStats(json.stats);
@@ -729,7 +730,7 @@ export default function AdminPage() {
       const url = new URL(`${import.meta.env.VITE_PUBLIC_SUPABASE_URL}/functions/v1/admin-security`);
       url.searchParams.set('action', 'list_ip_blocks');
       const res = await fetch(url.toString(), {
-        headers: { 'Authorization': `Bearer ${import.meta.env.VITE_PUBLIC_SUPABASE_ANON_KEY}` },
+        headers: { 'Authorization': getAuthorizationHeader() },
       });
       const json = await res.json();
       if (json.ip_blocks && json.ip_blocks.length > 0) {
@@ -757,7 +758,7 @@ export default function AdminPage() {
       const url = new URL(`${import.meta.env.VITE_PUBLIC_SUPABASE_URL}/functions/v1/admin-security`);
       url.searchParams.set('action', 'list_admins');
       const res = await fetch(url.toString(), {
-        headers: { 'Authorization': `Bearer ${import.meta.env.VITE_PUBLIC_SUPABASE_ANON_KEY}` },
+        headers: { 'Authorization': getAuthorizationHeader() },
       });
       const json = await res.json();
       if (json.admins && json.admins.length > 0) {
@@ -786,7 +787,7 @@ export default function AdminPage() {
     setTeamsLoading(true);
     try {
       const base = `${import.meta.env.VITE_PUBLIC_SUPABASE_URL}/functions/v1/admin-teams`;
-      const headers = { 'Authorization': `Bearer ${import.meta.env.VITE_PUBLIC_SUPABASE_ANON_KEY}` };
+      const headers = { 'Authorization': getAuthorizationHeader() };
       const [teamsRes, statsRes] = await Promise.allSettled([
         fetch(`${base}?action=list_teams`, { headers }),
         fetch(`${base}?action=team_stats`, { headers }),
@@ -819,7 +820,7 @@ export default function AdminPage() {
         if (mapped) fetchUrl.searchParams.set('status', mapped);
       }
       const res = await fetch(fetchUrl.toString(), {
-        headers: { 'Authorization': `Bearer ${import.meta.env.VITE_PUBLIC_SUPABASE_ANON_KEY}` },
+        headers: { 'Authorization': getAuthorizationHeader() },
       });
       const data = await res.json();
       if (data.items) setContentDbItems(data.items);
@@ -835,7 +836,7 @@ export default function AdminPage() {
       const fetchUrl = new URL(`${import.meta.env.VITE_PUBLIC_SUPABASE_URL}/functions/v1/admin-content`);
       fetchUrl.searchParams.set('action', 'stats');
       const res = await fetch(fetchUrl.toString(), {
-        headers: { 'Authorization': `Bearer ${import.meta.env.VITE_PUBLIC_SUPABASE_ANON_KEY}` },
+        headers: { 'Authorization': getAuthorizationHeader() },
       });
       const data = await res.json();
       if (data.stats) setContentDbStats(data.stats);
@@ -856,7 +857,7 @@ export default function AdminPage() {
       const fetchUrl = new URL(`${import.meta.env.VITE_PUBLIC_SUPABASE_URL}/functions/v1/admin-stats`);
       fetchUrl.searchParams.set('action', 'plan_dist');
       const res = await fetch(fetchUrl.toString(), {
-        headers: { 'Authorization': `Bearer ${import.meta.env.VITE_PUBLIC_SUPABASE_ANON_KEY}` },
+        headers: { 'Authorization': getAuthorizationHeader() },
       });
       const data = await res.json();
       if (data.plan_dist) {
@@ -879,7 +880,7 @@ export default function AdminPage() {
       const fetchUrl = new URL(`${import.meta.env.VITE_PUBLIC_SUPABASE_URL}/functions/v1/admin-stats`);
       fetchUrl.searchParams.set('action', 'api_health');
       const res = await fetch(fetchUrl.toString(), {
-        headers: { 'Authorization': `Bearer ${import.meta.env.VITE_PUBLIC_SUPABASE_ANON_KEY}` },
+        headers: { 'Authorization': getAuthorizationHeader() },
       });
       const data = await res.json();
       if (data.api_stats) setApiHealthData(data.api_stats);
@@ -1011,7 +1012,7 @@ export default function AdminPage() {
         await fetch(url.toString(), {
           method: 'POST',
           headers: {
-            'Authorization': `Bearer ${import.meta.env.VITE_PUBLIC_SUPABASE_ANON_KEY}`,
+            'Authorization': getAuthorizationHeader(),
             'Content-Type': 'application/json',
           },
           body: JSON.stringify({ id: ticketId, reply_content: replyContent, new_status: status }),
@@ -1021,7 +1022,7 @@ export default function AdminPage() {
         await fetch(url.toString(), {
           method: 'PATCH',
           headers: {
-            'Authorization': `Bearer ${import.meta.env.VITE_PUBLIC_SUPABASE_ANON_KEY}`,
+            'Authorization': getAuthorizationHeader(),
             'Content-Type': 'application/json',
           },
           body: JSON.stringify({ id: ticketId, status }),
@@ -1048,7 +1049,7 @@ export default function AdminPage() {
         await fetch(url.toString(), {
           method: 'PUT',
           headers: {
-            'Authorization': `Bearer ${import.meta.env.VITE_PUBLIC_SUPABASE_ANON_KEY}`,
+            'Authorization': getAuthorizationHeader(),
             'Content-Type': 'application/json',
           },
           body: JSON.stringify({
@@ -1063,7 +1064,7 @@ export default function AdminPage() {
         const res = await fetch(url.toString(), {
           method: 'POST',
           headers: {
-            'Authorization': `Bearer ${import.meta.env.VITE_PUBLIC_SUPABASE_ANON_KEY}`,
+            'Authorization': getAuthorizationHeader(),
             'Content-Type': 'application/json',
           },
           body: JSON.stringify({
@@ -1104,7 +1105,7 @@ export default function AdminPage() {
       url.searchParams.set('id', noticeId);
       await fetch(url.toString(), {
         method: 'DELETE',
-        headers: { 'Authorization': `Bearer ${import.meta.env.VITE_PUBLIC_SUPABASE_ANON_KEY}` },
+        headers: { 'Authorization': getAuthorizationHeader() },
       });
     } catch (e) {
       console.warn('Notice delete failed:', e);
@@ -1121,7 +1122,7 @@ export default function AdminPage() {
       await fetch(url.toString(), {
         method: 'POST',
         headers: {
-          'Authorization': `Bearer ${import.meta.env.VITE_PUBLIC_SUPABASE_ANON_KEY}`,
+          'Authorization': getAuthorizationHeader(),
           'Content-Type': 'application/json',
         },
         body: JSON.stringify({
@@ -1154,7 +1155,7 @@ export default function AdminPage() {
       await fetch(url.toString(), {
         method: 'PATCH',
         headers: {
-          'Authorization': `Bearer ${import.meta.env.VITE_PUBLIC_SUPABASE_ANON_KEY}`,
+          'Authorization': getAuthorizationHeader(),
           'Content-Type': 'application/json',
         },
         body: JSON.stringify({ code, is_active: newActive }),
@@ -1179,7 +1180,7 @@ export default function AdminPage() {
       const res = await fetch(fetchUrl.toString(), {
         method: 'POST',
         headers: {
-          'Authorization': `Bearer ${import.meta.env.VITE_PUBLIC_SUPABASE_ANON_KEY}`,
+          'Authorization': getAuthorizationHeader(),
           'Content-Type': 'application/json',
         },
         body: JSON.stringify({
@@ -1286,7 +1287,7 @@ export default function AdminPage() {
       await fetch(url.toString(), {
         method: 'POST',
         headers: {
-          'Authorization': `Bearer ${import.meta.env.VITE_PUBLIC_SUPABASE_ANON_KEY}`,
+          'Authorization': getAuthorizationHeader(),
           'Content-Type': 'application/json',
         },
         body: JSON.stringify({ ip_address: ipBlockInput, reason: ipBlockReason || '수동 차단' }),
@@ -1319,7 +1320,7 @@ export default function AdminPage() {
       await fetch(url.toString(), {
         method: 'PATCH',
         headers: {
-          'Authorization': `Bearer ${import.meta.env.VITE_PUBLIC_SUPABASE_ANON_KEY}`,
+          'Authorization': getAuthorizationHeader(),
           'Content-Type': 'application/json',
         },
         body: JSON.stringify({ id: block._id ?? block.ip }),
@@ -1345,7 +1346,7 @@ export default function AdminPage() {
       await fetch(url.toString(), {
         method: 'POST',
         headers: {
-          'Authorization': `Bearer ${import.meta.env.VITE_PUBLIC_SUPABASE_ANON_KEY}`,
+          'Authorization': getAuthorizationHeader(),
           'Content-Type': 'application/json',
         },
         body: JSON.stringify({
@@ -1386,7 +1387,7 @@ export default function AdminPage() {
       await fetch(url.toString(), {
         method: 'PATCH',
         headers: {
-          'Authorization': `Bearer ${import.meta.env.VITE_PUBLIC_SUPABASE_ANON_KEY}`,
+          'Authorization': getAuthorizationHeader(),
           'Content-Type': 'application/json',
         },
         body: JSON.stringify({ id: userId, member_grade: memberGrade, reason }),
@@ -1418,7 +1419,7 @@ export default function AdminPage() {
       await fetch(url.toString(), {
         method: 'PATCH',
         headers: {
-          'Authorization': `Bearer ${import.meta.env.VITE_PUBLIC_SUPABASE_ANON_KEY}`,
+          'Authorization': getAuthorizationHeader(),
           'Content-Type': 'application/json',
         },
         body: JSON.stringify({ id: userId, status: newStatus }),
@@ -1445,7 +1446,7 @@ export default function AdminPage() {
       await fetch(url.toString(), {
         method: 'POST',
         headers: {
-          'Authorization': `Bearer ${import.meta.env.VITE_PUBLIC_SUPABASE_ANON_KEY}`,
+          'Authorization': getAuthorizationHeader(),
           'Content-Type': 'application/json',
         },
         body: JSON.stringify({ id: userId, amount: numAmount }),
@@ -1465,7 +1466,7 @@ export default function AdminPage() {
       await fetch(url.toString(), {
         method: 'POST',
         headers: {
-          'Authorization': `Bearer ${import.meta.env.VITE_PUBLIC_SUPABASE_ANON_KEY}`,
+          'Authorization': getAuthorizationHeader(),
           'Content-Type': 'application/json',
         },
         body: JSON.stringify({ id: payId }),
@@ -1500,7 +1501,7 @@ export default function AdminPage() {
       await fetch(fetchUrl.toString(), {
         method: 'PUT',
         headers: {
-          'Authorization': `Bearer ${import.meta.env.VITE_PUBLIC_SUPABASE_ANON_KEY}`,
+          'Authorization': getAuthorizationHeader(),
           'Content-Type': 'application/json',
         },
         body: JSON.stringify({ id: adminId, permissions }),
@@ -2481,7 +2482,7 @@ export default function AdminPage() {
                           if (userPlanFilter && userPlanFilter !== '전체') url.searchParams.set('plan', userPlanFilter.toLowerCase());
                           if (f.key && f.key !== '전체') url.searchParams.set('grade', f.key);
                           setUsersLoading(true);
-                          fetch(url.toString(), { headers: { 'Authorization': `Bearer ${import.meta.env.VITE_PUBLIC_SUPABASE_ANON_KEY}` } })
+                          fetch(url.toString(), { headers: { 'Authorization': getAuthorizationHeader() } })
                             .then((r) => r.json())
                             .then((json) => {
                               if (json.users) {

@@ -2,6 +2,7 @@ import { useState, useEffect, useCallback } from 'react';
 import PgCronPanel from './PgCronPanel';
 import EmailAlertPanel from './EmailAlertPanel';
 import SlackAlertPanel from './SlackAlertPanel';
+import { getAuthorizationHeader } from '@/lib/env';
 
 interface ScheduleRow {
   service_slug: string;
@@ -188,8 +189,7 @@ export default function HealthCheckScheduler({ isDark, onToast }: Props) {
   const [viewMode, setViewMode] = useState<'manual' | 'pgcron' | 'email' | 'slack'>('manual');
 
   const SUPABASE_URL = import.meta.env.VITE_PUBLIC_SUPABASE_URL;
-  const ANON_KEY = import.meta.env.VITE_PUBLIC_SUPABASE_ANON_KEY;
-  const headers = { 'Authorization': `Bearer ${ANON_KEY}` };
+    const headers = { 'Authorization': getAuthorizationHeader() };
   const schedulerBase = `${SUPABASE_URL}/functions/v1/healthcheck-scheduler`;
 
   const t = {

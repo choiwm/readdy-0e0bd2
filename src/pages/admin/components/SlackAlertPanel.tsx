@@ -1,4 +1,5 @@
 import { useState, useEffect, useCallback } from 'react';
+import { getAuthorizationHeader } from '@/lib/env';
 
 // ── Types ──────────────────────────────────────────────────────────────────
 interface SlackSettings {
@@ -61,9 +62,8 @@ export default function SlackAlertPanel({ isDark, onToast }: Props) {
   const [savedSettings, setSavedSettings] = useState<SlackSettings | null>(null);
 
   const SUPABASE_URL = import.meta.env.VITE_PUBLIC_SUPABASE_URL;
-  const ANON_KEY = import.meta.env.VITE_PUBLIC_SUPABASE_ANON_KEY;
-  const base = `${SUPABASE_URL}/functions/v1/healthcheck-scheduler`;
-  const headers = { 'Authorization': `Bearer ${ANON_KEY}` };
+    const base = `${SUPABASE_URL}/functions/v1/healthcheck-scheduler`;
+  const headers = { 'Authorization': getAuthorizationHeader() };
 
   const t = {
     cardBg:    isDark ? 'bg-[#0f0f13]'         : 'bg-white',

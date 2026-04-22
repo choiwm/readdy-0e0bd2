@@ -1,4 +1,5 @@
 import { useState, useCallback } from 'react';
+import { getAuthorizationHeader } from '@/lib/env';
 
 interface ApiService {
   name: string;
@@ -89,7 +90,7 @@ export default function ApiKeyModal({ service, mode, onClose, onSave, isDark }: 
           {
             method: 'POST',
             headers: {
-              'Authorization': `Bearer ${import.meta.env.VITE_PUBLIC_SUPABASE_ANON_KEY}`,
+              'Authorization': getAuthorizationHeader(),
               'Content-Type': 'application/json',
             },
             body: JSON.stringify({
@@ -136,7 +137,7 @@ export default function ApiKeyModal({ service, mode, onClose, onSave, isDark }: 
         {
           method: 'POST',
           headers: {
-            'Authorization': `Bearer ${import.meta.env.VITE_PUBLIC_SUPABASE_ANON_KEY}`,
+            'Authorization': getAuthorizationHeader(),
             'Content-Type': 'application/json',
           },
           body: JSON.stringify({ service_slug: slug, raw_key: apiKey.trim() }),

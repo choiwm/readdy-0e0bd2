@@ -1,4 +1,5 @@
 import { useState, useCallback, useRef } from 'react';
+import { getAuthorizationHeader } from '@/lib/env';
 
 interface UserSearchResult {
   id: string;
@@ -91,7 +92,7 @@ export default function CreditGrantPanel({ isDark, onToast }: Props) {
       url.searchParams.set('search', q);
       url.searchParams.set('limit', '8');
       const res = await fetch(url.toString(), {
-        headers: { 'Authorization': `Bearer ${import.meta.env.VITE_PUBLIC_SUPABASE_ANON_KEY}` },
+        headers: { 'Authorization': getAuthorizationHeader() },
       });
       const data = await res.json();
       if (data.users) {
@@ -138,7 +139,7 @@ export default function CreditGrantPanel({ isDark, onToast }: Props) {
       const res = await fetch(url.toString(), {
         method: 'POST',
         headers: {
-          'Authorization': `Bearer ${import.meta.env.VITE_PUBLIC_SUPABASE_ANON_KEY}`,
+          'Authorization': getAuthorizationHeader(),
           'Content-Type': 'application/json',
         },
         body: JSON.stringify({ id: selectedUser.id, amount: amt, reason: singleReason || '관리자 직접 지급' }),
@@ -193,7 +194,7 @@ export default function CreditGrantPanel({ isDark, onToast }: Props) {
       if (batchTarget === 'plan') url.searchParams.set('plan', batchPlan);
       if (batchTarget === 'grade') url.searchParams.set('grade', batchGrade);
       const res = await fetch(url.toString(), {
-        headers: { 'Authorization': `Bearer ${import.meta.env.VITE_PUBLIC_SUPABASE_ANON_KEY}` },
+        headers: { 'Authorization': getAuthorizationHeader() },
       });
       const data = await res.json();
       const count = data.total ?? data.users?.length ?? 0;
@@ -219,7 +220,7 @@ export default function CreditGrantPanel({ isDark, onToast }: Props) {
       const res = await fetch(url.toString(), {
         method: 'POST',
         headers: {
-          'Authorization': `Bearer ${import.meta.env.VITE_PUBLIC_SUPABASE_ANON_KEY}`,
+          'Authorization': getAuthorizationHeader(),
           'Content-Type': 'application/json',
         },
         body: JSON.stringify({

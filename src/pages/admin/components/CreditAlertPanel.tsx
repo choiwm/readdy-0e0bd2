@@ -1,4 +1,5 @@
 import { useState, useEffect, useCallback } from 'react';
+import { getAuthorizationHeader } from '@/lib/env';
 
 interface AlertStats {
   total_configured: number;
@@ -16,8 +17,6 @@ interface Props {
 }
 
 const NOTIFY_URL = `${import.meta.env.VITE_PUBLIC_SUPABASE_URL}/functions/v1/credit-alert-notify`;
-const ANON_KEY = import.meta.env.VITE_PUBLIC_SUPABASE_ANON_KEY;
-
 const TEST_TYPES = [
   { key: 'credit_alert', label: '크레딧 부족', icon: 'ri-copper-diamond-line', color: 'text-amber-400' },
   { key: 'system_notice', label: '시스템 공지', icon: 'ri-megaphone-line', color: 'text-sky-400' },
@@ -70,7 +69,7 @@ export default function CreditAlertPanel({ isDark, onToast }: Props) {
     setLoading(true);
     try {
       const res = await fetch(`${NOTIFY_URL}?action=admin_stats`, {
-        headers: { Authorization: `Bearer ${ANON_KEY}` },
+        headers: { Authorization: getAuthorizationHeader() },
       });
       const data = await res.json();
       if (data.stats) setStats(data.stats);
@@ -89,7 +88,7 @@ export default function CreditAlertPanel({ isDark, onToast }: Props) {
     try {
       const res = await fetch(`${NOTIFY_URL}?action=admin_test_send`, {
         method: 'POST',
-        headers: { Authorization: `Bearer ${ANON_KEY}`, 'Content-Type': 'application/json' },
+        headers: { Authorization: getAuthorizationHeader(), 'Content-Type': 'application/json' },
         body: JSON.stringify({ user_id: testUserId, test_type: testType }),
       });
       const data = await res.json();
@@ -116,7 +115,7 @@ export default function CreditAlertPanel({ isDark, onToast }: Props) {
     try {
       const res = await fetch(`${NOTIFY_URL}?action=broadcast_notice`, {
         method: 'POST',
-        headers: { Authorization: `Bearer ${ANON_KEY}`, 'Content-Type': 'application/json' },
+        headers: { Authorization: getAuthorizationHeader(), 'Content-Type': 'application/json' },
         body: JSON.stringify({
           title: broadcastTitle,
           message: broadcastMessage,

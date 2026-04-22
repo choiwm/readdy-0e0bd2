@@ -1,4 +1,5 @@
 import { useState, useEffect, useCallback } from 'react';
+import { getAuthorizationHeader } from '@/lib/env';
 
 // ── Types ──────────────────────────────────────────────────────────────────
 interface CronJob {
@@ -191,9 +192,8 @@ export default function PgCronPanel({ isDark, onToast }: Props) {
   const [deletingJob, setDeletingJob] = useState<string | null>(null);
 
   const SUPABASE_URL = import.meta.env.VITE_PUBLIC_SUPABASE_URL;
-  const ANON_KEY = import.meta.env.VITE_PUBLIC_SUPABASE_ANON_KEY;
-  const cronBase = `${SUPABASE_URL}/functions/v1/cron-manager`;
-  const headers = { 'Authorization': `Bearer ${ANON_KEY}` };
+    const cronBase = `${SUPABASE_URL}/functions/v1/cron-manager`;
+  const headers = { 'Authorization': getAuthorizationHeader() };
 
   const t = {
     cardBg:    isDark ? 'bg-[#0f0f13]'         : 'bg-white',
