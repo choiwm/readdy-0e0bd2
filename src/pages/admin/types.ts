@@ -104,3 +104,15 @@ export interface PaymentRecord {
   status: string;
   method: string;
 }
+
+export interface TeamRecord {
+  id: string;
+  name: string;
+  description: string | null;
+  owner_id: string | null;
+  status: 'active' | 'inactive' | 'archived';
+  content_access: 'shared' | 'private' | 'restricted';
+  max_members: number;
+  member_count: number;
+  created_at: string;
+}
