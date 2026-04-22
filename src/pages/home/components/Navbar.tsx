@@ -18,7 +18,7 @@ export default function Navbar() {
   const [userMenuOpen, setUserMenuOpen] = useState(false);
   const [authModalOpen, setAuthModalOpen] = useState(false);
   const [authMode, setAuthMode] = useState<'login' | 'signup'>('login');
-  const { isLoggedIn, user, profile, signOut, loading } = useAuth();
+  const { isLoggedIn: _isLoggedIn, user, profile, signOut, loading } = useAuth();
   const { credits } = useCredits();
   const userMenuRef = useRef<HTMLDivElement>(null);
 

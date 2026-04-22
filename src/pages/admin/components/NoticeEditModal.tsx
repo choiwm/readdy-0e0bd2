@@ -13,7 +13,7 @@ export default function NoticeEditModal({ notice, onClose, onSave, isDark }: Pro
   const [title, setTitle] = useState(notice?.title ?? '');
   const [type, setType] = useState(notice?.type ?? '업데이트');
   const [content, setContent] = useState('');
-  const [status, setStatus] = useState<'published' | 'draft'>(
+  const [_status, _setStatus] = useState<'published' | 'draft'>(
     (notice?.status as 'published' | 'draft') ?? 'draft'
   );
 

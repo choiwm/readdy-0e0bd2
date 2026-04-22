@@ -67,7 +67,7 @@ const initialCuts: Cut[] = [
   { id: 6, start: 32.3, end: 38.0, text: '세상을 움직이는 보이지 않는 힘, 인공지능.\n\n지금 바로 여러분의 삶과 비즈니스에 혁신을 도입해 보세요!', image: null, prompt: '', optimized: false },
 ];
 
-const cutImages = [
+const _cutImages = [
   'https://readdy.ai/api/search-image?query=futuristic%20AI%20neural%20network%20glowing%20nodes%20dark%20background%20cinematic%20blue%20purple%20light%20high%20quality%20render&width=480&height=270&seq=cut1img&orientation=landscape',
   'https://readdy.ai/api/search-image?query=smart%20city%20morning%20commute%20autonomous%20vehicles%20and%20digital%20navigation%20holographic%20display%20urban%20future&width=480&height=270&seq=cut2img&orientation=landscape',
   'https://readdy.ai/api/search-image?query=smart%20factory%20automation%20robots%20assembly%20line%20industrial%20AI%20technology%20modern%20manufacturing&width=480&height=270&seq=cut3img&orientation=landscape',
@@ -500,9 +500,9 @@ export default function Step4Image({
   const [regenProgress, setRegenProgress] = useState(0);
   const [regenDone, setRegenDone] = useState(false);
   const [showOptimizePanel, setShowOptimizePanel] = useState(false);
-  const [isOptimizingAll, setIsOptimizingAll] = useState(false);
-  const [optimizeAllProgress, setOptimizeAllProgress] = useState(0);
-  const [optimizeAllDone, setOptimizeAllDone] = useState(false);
+  const [_isOptimizingAll, setIsOptimizingAll] = useState(false);
+  const [_optimizeAllProgress, setOptimizeAllProgress] = useState(0);
+  const [_optimizeAllDone, setOptimizeAllDone] = useState(false);
   const [styleSearch, setStyleSearch] = useState('');
   const [librarySearch, setLibrarySearch] = useState('');
   const [styleHover, setStyleHover] = useState<string | null>(null);
@@ -755,7 +755,7 @@ export default function Step4Image({
   }, [cuts, selectedStyle, selectedKeywords, imageModel, selectedRatio, user, saveToGallery]);
 
   // Optimize all prompts with channel data
-  const handleOptimizeAll = useCallback(() => {
+  const _handleOptimizeAll = useCallback(() => {
     setIsOptimizingAll(true);
     setOptimizeAllDone(false);
     setOptimizeAllProgress(0);

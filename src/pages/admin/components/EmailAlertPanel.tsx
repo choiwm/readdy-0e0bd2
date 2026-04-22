@@ -142,7 +142,7 @@ export default function EmailAlertPanel({ isDark, onToast }: Props) {
   const [testSending, setTestSending] = useState(false);
   const [hasChanges, setHasChanges] = useState(false);
   const [savedSettings, setSavedSettings] = useState<EmailSettings | null>(null);
-  const [resendKeySet, setResendKeySet] = useState<boolean | null>(null);
+  const [_resendKeySet, setResendKeySet] = useState<boolean | null>(null);
 
   const SUPABASE_URL = import.meta.env.VITE_PUBLIC_SUPABASE_URL;
     const base = `${SUPABASE_URL}/functions/v1/healthcheck-scheduler`;

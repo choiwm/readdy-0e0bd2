@@ -47,7 +47,7 @@ const MODEL_DEFS: ModelDef[] = [
   },
 ];
 
-const models = MODEL_DEFS.map((m) => m.id);
+const _models = MODEL_DEFS.map((m) => m.id);
 const ratios = ['1K · 16:9 · PNG', '4K · 1:1 · PNG', '2K · 9:16 · PNG'];
 const tabs = ['IMAGE', 'VIDEO', 'AVATAR', 'MODIFY'];
 
@@ -467,9 +467,9 @@ export default function PromptBar({
   const [showComingSoonToast, setShowComingSoonToast] = useState(false);
   const prevCounterRef = useRef<number>(0);
 
-  const { credits, deduct, canAfford, maxCredits, isLoggedIn } = useCredits();
+  const { credits, deduct: _deduct, canAfford: _canAfford, maxCredits: _maxCredits, isLoggedIn } = useCredits();
   // [DEBUG] 크레딧 강제 우회: 크레딧 0이어도 항상 생성 가능하게 테스트
-  const debugCredits = Math.max(credits, 999);
+  const _debugCredits = Math.max(credits, 999);
 
   // 현재 선택된 모델 + 타입의 생성 비용
   const currentCost = useMemo(() => getCost(selectedModel, activeTab), [selectedModel, activeTab]);

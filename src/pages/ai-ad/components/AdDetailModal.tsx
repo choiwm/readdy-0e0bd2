@@ -174,7 +174,7 @@ async function pollImageResult(
 }
 
 // fal.ai error_type 중 재시도 가능한 타입 목록 (공식 문서 기준)
-const FAL_RETRYABLE_ERROR_TYPES = new Set([
+const _FAL_RETRYABLE_ERROR_TYPES = new Set([
   'request_timeout', 'startup_timeout', 'runner_scheduling_failure',
   'runner_connection_timeout', 'runner_disconnected', 'runner_connection_refused',
   'runner_connection_error', 'runner_incomplete_response', 'runner_server_error',
@@ -309,7 +309,7 @@ export default function AdDetailModal({ template, productName, productDesc, side
   const [result, setResult] = useState<GenerationResult | null>(null);
   const [closeConfirm, setCloseConfirm] = useState(false);
   const [snsExportOpen, setSnsExportOpen] = useState(false);
-  const [savedToMyWorks, setSavedToMyWorks] = useState(false);
+  const [_savedToMyWorks, setSavedToMyWorks] = useState(false);
   // 업로드된 Storage URL 캐시 (같은 이미지 재업로드 방지)
   const [uploadedUrls, setUploadedUrls] = useState<string[]>([]);
   const [elapsedSec, setElapsedSec] = useState(0);

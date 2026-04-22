@@ -446,8 +446,8 @@ function EmbeddedYouTubeStudio({ addProject, initialProject, onBack, resumeStep,
   const [step1Keywords, setStep1Keywords] = useState<string[]>([]);
   const [step1ChannelName, setStep1ChannelName] = useState<string>('');
   const [step2Script, setStep2Script] = useState<string>('');
-  const [selectedKeywords, setSelectedKeywords] = useState<string[]>([]);
-  const [channelName, setChannelName] = useState<string>('');
+  const [_selectedKeywords, _setSelectedKeywords] = useState<string[]>([]);
+  const [channelName, _setChannelName] = useState<string>('');
   const [voiceData, setVoiceData] = useState<VoiceData | null>(null);
   const [step4Images, setStep4Images] = useState<string[]>([]);
   const [step4Cuts, setStep4Cuts] = useState<Step4ImageData[] | undefined>(undefined);
@@ -553,7 +553,7 @@ function EmbeddedYouTubeStudio({ addProject, initialProject, onBack, resumeStep,
     ratio: selectedRatio,
   };
 
-  const stepInfo = YT_STEP_TITLES[currentStep - 1];
+  const _stepInfo = YT_STEP_TITLES[currentStep - 1];
 
   const renderStep = () => {
     switch (currentStep) {
@@ -742,7 +742,7 @@ function EmbeddedYouTubeStudio({ addProject, initialProject, onBack, resumeStep,
 }
 
 export default function AIAutomationPage() {
-  const navigate = useNavigate();
+  const _navigate = useNavigate();
   const { user } = useAuth();
 
   const { deduct } = useCredits();
@@ -776,10 +776,10 @@ export default function AIAutomationPage() {
     projects,
     addProject,
     updateProjects,
-    upsertProject,
+    upsertProject: _upsertProject,
   } = useAutomationProjects(automationProjects, user?.id ?? null);
   const [newlyAddedId, setNewlyAddedId] = useState<string | null>(null);
-  const [viewState, setViewState] = useState<ViewState>('gallery');
+  const [viewState, _setViewState] = useState<ViewState>('gallery');
   const [editingProject, setEditingProject] = useState<AutomationProject | null>(null);
   const [showAutopilotModal, setShowAutopilotModal] = useState(false);
   const [showInfoPanel, setShowInfoPanel] = useState(false);
@@ -979,7 +979,7 @@ export default function AIAutomationPage() {
   };
 
   const currentVoice = voiceList.find((v) => v.id === selectedVoice)!;
-  const currentImageModel = imageModelList.find((m) => m.id === imageModel)!;
+  const _currentImageModel = imageModelList.find((m) => m.id === imageModel)!;
 
   const closeDropdowns = () => {
     setVoiceDropOpen(false);

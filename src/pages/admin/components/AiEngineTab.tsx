@@ -249,7 +249,7 @@ export default function AiEngineTab({
     }
     gpuIntervalRef.current = setInterval(() => {
       setGpuLoads((prev) => prev.map((g, i) => {
-        const base = GPU_INSTANCES[i];
+        const _base = GPU_INSTANCES[i];
         const delta = (Math.random() - 0.5) * 6;
         const load = Math.max(5, Math.min(98, g.load + delta));
         const mem = Math.max(10, Math.min(95, g.mem + (Math.random() - 0.5) * 4));

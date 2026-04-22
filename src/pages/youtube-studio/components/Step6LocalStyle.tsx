@@ -613,7 +613,7 @@ export default function Step6LocalStyle({ onBack, projectMeta, onSaveToGallery, 
     setThumbGenerating(true);
     setThumbGenerated(false);
     setTimeout(() => {
-      const titleEncoded = encodeURIComponent(`YouTube thumbnail ${thumbnailTitle} AI technology dramatic cinematic bold text overlay dark background high contrast`);
+      const _titleEncoded = encodeURIComponent(`YouTube thumbnail ${thumbnailTitle} AI technology dramatic cinematic bold text overlay dark background high contrast`);
       const prompts = [
         `https://readdy.ai/api/search-image?query=$%7BtitleEncoded%7D&width=280&height=158&seq=thumb_gen1&orientation=landscape`,
         'https://readdy.ai/api/search-image?query=AI%20technology%20futuristic%20thumbnail%20YouTube%20bold%20dramatic%20lighting%20neon%20glow%20dark%20background&width=280&height=158&seq=thumb_gen2&orientation=landscape',

@@ -14,7 +14,6 @@ import CreditGrantPanel from './components/CreditGrantPanel';
 import type { CsTicket, Notice, PromptTemplate, IpBlock, AdminAccount } from './types';
 import { apiStatus, contentTrends, dailySignups, planDist, auditLogs } from './mockData';
 import { StatusBadge, PlanBadge, PriorityBadge } from './components/Badges';
-import GradePermissionsPanel from './components/GradePermissionsPanel';
 import NotificationPanel, { type Notification, initialNotifications } from './components/NotificationPanel';
 import { GradeBadge, GRADE_META, SectionHeader, subscriptionPlans } from './components/AdminHelpers';
 import GradeSettingsTab from './components/GradeSettingsTab';
@@ -167,7 +166,7 @@ export default function AdminPage() {
   const userSearchDebounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const [contentFilter, setContentFilter] = useState('전체');
   const [selectedUser, setSelectedUser] = useState<UserRecord | null>(null);
-  const [revenueRange, setRevenueRange] = useState<'daily' | 'weekly' | 'monthly'>('monthly');
+  const [_revenueRange, _setRevenueRange] = useState<'daily' | 'weekly' | 'monthly'>('monthly');
   const [noticeModal, setNoticeModal] = useState(false);
   const [couponModal, setCouponModal] = useState(false);
   const [newNoticeTitle, setNewNoticeTitle] = useState('');
@@ -270,7 +269,7 @@ export default function AdminPage() {
 
   // ── Security State ──
   const [ipBlockList, setIpBlockList] = useState<IpBlock[]>([]);
-  const [adminAccounts, setAdminAccounts] = useState<AdminAccount[]>([]);
+  const [_adminAccounts, setAdminAccounts] = useState<AdminAccount[]>([]);
   // Add admin form state
   const [newAdminName, setNewAdminName] = useState('');
   const [newAdminEmail, setNewAdminEmail] = useState('');
@@ -1172,7 +1171,7 @@ export default function AdminPage() {
   };
 
   // CS: payment refund
-  const handleRefund = (payId: string) => {
+  const _handleRefund = (payId: string) => {
     setPayments((prev) => prev.map((p) => p.id === payId ? { ...p, status: 'refunded' } : p));
     addToast(`${payId} 환불 처리됐습니다`, 'success');
   };
@@ -1582,7 +1581,7 @@ export default function AdminPage() {
   // DB에서 직접 검색/필터링하므로 로컬 필터 없이 displayUsers 그대로 사용
   const filteredUsers = displayUsers;
 
-  const filteredContent = contentItems.filter((c) => {
+  const _filteredContent = contentItems.filter((c) => {
     if (contentFilter === '전체') return true;
     if (contentFilter === '승인') return c.status === 'approved';
     if (contentFilter === '검토중') return c.status === 'pending';

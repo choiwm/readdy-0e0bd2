@@ -910,7 +910,7 @@ export default function ApiKeyStatusPanel({ isDark, onKeyRenew }: Props) {
         )}
 
         {apiKeys.map((key) => {
-          const cfg = statusConfig[key.status] ?? statusConfig.inactive;
+          const _cfg = statusConfig[key.status] ?? statusConfig.inactive;
           const stats = usageStats[key.service_slug];
           const hasKey = !!key.key_hint;
           const history = Array.isArray(key.test_history) ? key.test_history : [];

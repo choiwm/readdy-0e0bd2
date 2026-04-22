@@ -188,7 +188,7 @@ export default function CreditPurchasePage() {
     setShowPaymentModal(true);
   };
 
-  const handlePaymentConfirm = () => {
+  const _handlePaymentConfirm = () => {
     // 결제 시스템 준비 중 — 실제 결제 연동 전까지 고객지원으로 안내
     // 절대로 크레딧을 직접 지급하지 않음
     setShowPaymentModal(false);

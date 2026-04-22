@@ -401,7 +401,7 @@ export default function AIBoardPage() {
   const {
     projects,
     setProjects,
-    isLoading: isDbLoading,
+    isLoading: _isDbLoading,
     isSaving: isDbSaving,
     loadProjects,
     saveProject,
@@ -414,7 +414,7 @@ export default function AIBoardPage() {
   const [projectTitle, setProjectTitle] = useState('새벽 카페 씬');
   const [editingTitle, setEditingTitle] = useState(false);
   const [aspectRatio, setAspectRatio] = useState('16:9');
-  const [cutCount, setCutCount] = useState(4);
+  const [_cutCount, setCutCount] = useState(4);
   const [model, setModel] = useState('Flux Realism');
   const [resolution, setResolution] = useState('1K');
   const [outputMode, setOutputMode] = useState<'image' | 'video'>('image');
@@ -433,7 +433,7 @@ export default function AIBoardPage() {
   const [showGenerateModal, setShowGenerateModal] = useState(false);
   const [generateTotalCount, setGenerateTotalCount] = useState(0);
   const [activeDragId, setActiveDragId] = useState<string | null>(null);
-  const [dragOverId, setDragOverId] = useState<string | null>(null);
+  const [_dragOverId, setDragOverId] = useState<string | null>(null);
   const [pendingCutCount, setPendingCutCount] = useState<number | null>(null);
   const [deleteShotId, setDeleteShotId] = useState<string | null>(null);
   const [showShotDeletedToast, setShowShotDeletedToast] = useState(false);

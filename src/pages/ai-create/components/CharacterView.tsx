@@ -203,7 +203,7 @@ export default function CharacterView({
 }: CharacterViewProps) {
   const [internalCategory, setInternalCategory] = useState<CategoryFilter>('전체');
   const activeCategory = (externalCategory as CategoryFilter) ?? internalCategory;
-  const setActiveCategory = useCallback((cat: CategoryFilter) => {
+  const _setActiveCategory = useCallback((cat: CategoryFilter) => {
     setInternalCategory(cat);
     onCategoryChange?.(cat);
   }, [onCategoryChange]);

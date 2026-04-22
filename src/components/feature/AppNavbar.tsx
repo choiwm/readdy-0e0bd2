@@ -20,7 +20,7 @@ interface AppNavbarProps {
 
 export default function AppNavbar({ active, hideBottomNav = false }: AppNavbarProps) {
   const { pathname } = useLocation();
-  const { isLoggedIn, user, profile, signOut, loading } = useAuth();
+  const { isLoggedIn: _isLoggedIn, user, profile, signOut, loading } = useAuth();
   const { notifications, unreadCount, markRead, markAllRead } = useNotifications();
   const [userMenuOpen, setUserMenuOpen] = useState(false);
   const [notifOpen, setNotifOpen] = useState(false);
