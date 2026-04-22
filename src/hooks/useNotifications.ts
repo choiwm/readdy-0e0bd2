@@ -1,6 +1,7 @@
 import { useState, useCallback, useEffect, useRef } from 'react';
 import { supabase } from '@/lib/supabase';
 import { useAuth } from '@/hooks/useAuth';
+import { callEdge } from '@/lib/edgeClient';
 import { logError } from '@/utils/errorHandler';
 
 export type NotificationType =
@@ -104,8 +105,7 @@ export const NOTIF_CONFIG: Record<NotificationType, {
   },
 };
 
-const NOTIFY_FUNCTION_URL = `${import.meta.env.VITE_PUBLIC_SUPABASE_URL}/functions/v1/credit-alert-notify`;
-const ANON_KEY = import.meta.env.VITE_PUBLIC_SUPABASE_ANON_KEY;
+const NOTIFY_FN = 'credit-alert-notify';
 
 export function useNotifications() {
   const { isLoggedIn, profile } = useAuth();
@@ -118,12 +118,15 @@ export function useNotifications() {
     if (!isLoggedIn || !profile?.id) return;
     setLoading(true);
     try {
-      const res = await fetch(
-        `${NOTIFY_FUNCTION_URL}?action=get_notifications&user_id=${profile.id}&limit=40`,
-        { headers: { Authorization: `Bearer ${ANON_KEY}` } },
+      const data = await callEdge<{ notifications?: AppNotification[]; unread_count?: number }>(
+        NOTIFY_FN,
+        {
+          method: 'GET',
+          query: { action: 'get_notifications', user_id: profile.id, limit: 40 },
+          retries: 0,
+        },
       );
-      const data = await res.json();
-      if (data.notifications) {
+      if (data?.notifications) {
         setNotifications(data.notifications);
         setUnreadCount(data.unread_count ?? 0);
       }
@@ -154,12 +157,14 @@ export function useNotifications() {
     );
     setUnreadCount((prev) => Math.max(0, prev - 1));
     try {
-      await fetch(`${NOTIFY_FUNCTION_URL}?action=mark_read`, {
-        method: 'POST',
-        headers: { Authorization: `Bearer ${ANON_KEY}`, 'Content-Type': 'application/json' },
-        body: JSON.stringify({ user_id: profile.id, notification_id: notificationId }),
+      await callEdge(NOTIFY_FN, {
+        query: { action: 'mark_read' },
+        body: { user_id: profile.id, notification_id: notificationId },
+        retries: 0,
       });
-    } catch (err) { logError(err, { where: "useNotifications" }, "warn"); }
+    } catch (err) {
+      logError(err, { where: 'useNotifications.markRead' }, 'warn');
+    }
   }, [profile?.id]);
 
   const markAllRead = useCallback(async () => {
@@ -167,12 +172,14 @@ export function useNotifications() {
     setNotifications((prev) => prev.map((n) => ({ ...n, is_read: true })));
     setUnreadCount(0);
     try {
-      await fetch(`${NOTIFY_FUNCTION_URL}?action=mark_read`, {
-        method: 'POST',
-        headers: { Authorization: `Bearer ${ANON_KEY}`, 'Content-Type': 'application/json' },
-        body: JSON.stringify({ user_id: profile.id, mark_all: true }),
+      await callEdge(NOTIFY_FN, {
+        query: { action: 'mark_read' },
+        body: { user_id: profile.id, mark_all: true },
+        retries: 0,
       });
-    } catch (err) { logError(err, { where: "useNotifications" }, "warn"); }
+    } catch (err) {
+      logError(err, { where: 'useNotifications.markAllRead' }, 'warn');
+    }
   }, [profile?.id]);
 
   // ── 생성 시작 알림 (진행 중) ─────────────────────────────────────────
@@ -183,14 +190,13 @@ export function useNotifications() {
   }): Promise<string | null> => {
     if (!profile?.id) return null;
     try {
-      const res = await fetch(`${NOTIFY_FUNCTION_URL}?action=generation_in_progress`, {
-        method: 'POST',
-        headers: { Authorization: `Bearer ${ANON_KEY}`, 'Content-Type': 'application/json' },
-        body: JSON.stringify({ user_id: profile.id, ...params }),
+      const data = await callEdge<{ notification_id?: string }>(NOTIFY_FN, {
+        query: { action: 'generation_in_progress' },
+        body: { user_id: profile.id, ...params },
+        retries: 0,
       });
-      const data = await res.json();
       // 로컬 상태에 즉시 반영
-      if (data.notification_id) {
+      if (data?.notification_id) {
         const typeLabels: Record<string, string> = {
           image: '이미지', video: '영상', music: '음악', tts: 'TTS 음성', sfx: '효과음', transcribe: '음성 전사', clean: '오디오 클린',
         };
@@ -207,7 +213,7 @@ export function useNotifications() {
         setNotifications((prev) => [newNotif, ...prev]);
         setUnreadCount((prev) => prev + 1);
       }
-      return data.notification_id ?? null;
+      return data?.notification_id ?? null;
     } catch (err) {
       logError(err, { where: 'useNotifications.sendGenerationInProgress' }, 'warn');
       return null;
@@ -225,10 +231,10 @@ export function useNotifications() {
   }) => {
     if (!profile?.id) return;
     try {
-      await fetch(`${NOTIFY_FUNCTION_URL}?action=generation_complete`, {
-        method: 'POST',
-        headers: { Authorization: `Bearer ${ANON_KEY}`, 'Content-Type': 'application/json' },
-        body: JSON.stringify({ user_id: profile.id, ...params }),
+      await callEdge(NOTIFY_FN, {
+        query: { action: 'generation_complete' },
+        body: { user_id: profile.id, ...params },
+        retries: 0,
       });
       // 로컬 상태 업데이트
       if (params.notification_id) {
@@ -266,10 +272,10 @@ export function useNotifications() {
   }) => {
     if (!profile?.id) return;
     try {
-      await fetch(`${NOTIFY_FUNCTION_URL}?action=generation_failed`, {
-        method: 'POST',
-        headers: { Authorization: `Bearer ${ANON_KEY}`, 'Content-Type': 'application/json' },
-        body: JSON.stringify({ user_id: profile.id, ...params }),
+      await callEdge(NOTIFY_FN, {
+        query: { action: 'generation_failed' },
+        body: { user_id: profile.id, ...params },
+        retries: 0,
       });
       if (params.notification_id) {
         const typeLabels: Record<string, string> = {
@@ -304,12 +310,14 @@ export function useNotifications() {
   }) => {
     if (!profile?.id) return;
     try {
-      await fetch(`${NOTIFY_FUNCTION_URL}?action=generation_complete`, {
-        method: 'POST',
-        headers: { Authorization: `Bearer ${ANON_KEY}`, 'Content-Type': 'application/json' },
-        body: JSON.stringify({ user_id: profile.id, ...params }),
+      await callEdge(NOTIFY_FN, {
+        query: { action: 'generation_complete' },
+        body: { user_id: profile.id, ...params },
+        retries: 0,
       });
-    } catch (err) { logError(err, { where: "useNotifications" }, "warn"); }
+    } catch (err) {
+      logError(err, { where: 'useNotifications.sendGenerationComplete' }, 'warn');
+    }
   }, [profile?.id]);
 
   // Supabase Realtime으로 새 알림 실시간 수신
