@@ -49,7 +49,7 @@ export default function AISoundPage() {
   });
   const progressTimerRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const [visibleCount, setVisibleCount] = useState(9);
-  const [starredIds, setStarredIds] = useState<Set<number>>(new Set());
+  const [starredIds, setStarredIds] = useState<Set<string | number>>(new Set());
   const [langFilters, setLangFilters] = useState<Set<string>>(new Set());
   const [toasts, setToasts] = useState<ToastItem[]>([]);
   const [highlightedId, setHighlightedId] = useState<string | null>(null);
@@ -118,7 +118,7 @@ export default function AISoundPage() {
     return () => { document.body.style.overflow = ''; };
   }, [mobileSidebarOpen, mobileHistoryOpen]);
 
-  const handleToggleStar = useCallback((id: number) => {
+  const handleToggleStar = useCallback((id: string | number) => {
     setStarredIds((prev) => {
       const next = new Set(prev);
       if (next.has(id)) next.delete(id); else next.add(id);

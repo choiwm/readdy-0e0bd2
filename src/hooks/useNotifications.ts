@@ -1,6 +1,7 @@
 import { useState, useCallback, useEffect, useRef } from 'react';
 import { supabase } from '@/lib/supabase';
 import { useAuth } from '@/hooks/useAuth';
+import { logError } from '@/utils/errorHandler';
 
 export type NotificationType =
   | 'credit_alert'
@@ -126,8 +127,8 @@ export function useNotifications() {
         setNotifications(data.notifications);
         setUnreadCount(data.unread_count ?? 0);
       }
-    } catch {
-      // 조용히 실패
+    } catch (err) {
+      logError(err, { where: 'useNotifications.fetchNotifications' }, 'warn');
     } finally {
       setLoading(false);
     }
@@ -158,7 +159,7 @@ export function useNotifications() {
         headers: { Authorization: `Bearer ${ANON_KEY}`, 'Content-Type': 'application/json' },
         body: JSON.stringify({ user_id: profile.id, notification_id: notificationId }),
       });
-    } catch { /* 무시 */ }
+    } catch (err) { logError(err, { where: "useNotifications" }, "warn"); }
   }, [profile?.id]);
 
   const markAllRead = useCallback(async () => {
@@ -171,7 +172,7 @@ export function useNotifications() {
         headers: { Authorization: `Bearer ${ANON_KEY}`, 'Content-Type': 'application/json' },
         body: JSON.stringify({ user_id: profile.id, mark_all: true }),
       });
-    } catch { /* 무시 */ }
+    } catch (err) { logError(err, { where: "useNotifications" }, "warn"); }
   }, [profile?.id]);
 
   // ── 생성 시작 알림 (진행 중) ─────────────────────────────────────────
@@ -207,7 +208,8 @@ export function useNotifications() {
         setUnreadCount((prev) => prev + 1);
       }
       return data.notification_id ?? null;
-    } catch {
+    } catch (err) {
+      logError(err, { where: 'useNotifications.sendGenerationInProgress' }, 'warn');
       return null;
     }
   }, [profile?.id]);
@@ -252,7 +254,7 @@ export function useNotifications() {
         // 새 알림 추가
         await fetchNotifications();
       }
-    } catch { /* 무시 */ }
+    } catch (err) { logError(err, { where: "useNotifications" }, "warn"); }
   }, [profile?.id, fetchNotifications]);
 
   // ── 생성 실패 알림 ────────────────────────────────────────────────────
@@ -289,7 +291,7 @@ export function useNotifications() {
           ),
         );
       }
-    } catch { /* 무시 */ }
+    } catch (err) { logError(err, { where: "useNotifications" }, "warn"); }
   }, [profile?.id]);
 
   // ── 레거시 호환 (기존 코드에서 사용 중) ──────────────────────────────
@@ -307,7 +309,7 @@ export function useNotifications() {
         headers: { Authorization: `Bearer ${ANON_KEY}`, 'Content-Type': 'application/json' },
         body: JSON.stringify({ user_id: profile.id, ...params }),
       });
-    } catch { /* 무시 */ }
+    } catch (err) { logError(err, { where: "useNotifications" }, "warn"); }
   }, [profile?.id]);
 
   // Supabase Realtime으로 새 알림 실시간 수신

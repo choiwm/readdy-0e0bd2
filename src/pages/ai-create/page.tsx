@@ -118,7 +118,6 @@ export default function AICreatePage() {
       }
     }
     setViewState('gallery');
-  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []); // ref에서 읽으므로 의존성 불필요
 
   const handleGenerationCancel = useCallback(() => {

@@ -178,7 +178,7 @@ export default function TranscribePanel({ onDeductCredits, credits = 999 }: Tran
     startFakeProgress(0, 30, 1500, '파일 업로드 중...');
     try {
       const { data: { session } } = await supabase.auth.getSession();
-      const authHeader = session?.access_token
+      const authHeader: Record<string, string> = session?.access_token
         ? { Authorization: `Bearer ${session.access_token}` }
         : {};
       const formData = new FormData();

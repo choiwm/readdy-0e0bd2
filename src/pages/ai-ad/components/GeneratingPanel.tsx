@@ -34,7 +34,6 @@ export default function GeneratingPanel({
     return () => {
       if (timerRef.current) clearInterval(timerRef.current);
     };
-  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []); // 의도적으로 빈 deps — 마운트 시 한 번만 실행
 
   const formatElapsed = (sec: number) => {

@@ -730,7 +730,7 @@ export default function EffectsPanel({
           </button>
         )}
         <button
-          onClick={handleGenerate}
+          onClick={() => handleGenerate()}
           disabled={!prompt.trim() || isGenerating || credits < 2}
           className="flex items-center gap-2 px-6 md:px-10 py-2.5 md:py-3.5 bg-gradient-to-r from-emerald-500 to-teal-500 hover:from-emerald-400 hover:to-teal-400 disabled:opacity-40 disabled:cursor-not-allowed text-white font-bold text-sm rounded-xl transition-all cursor-pointer whitespace-nowrap"
         >

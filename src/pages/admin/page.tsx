@@ -602,7 +602,6 @@ export default function AdminPage() {
     } finally {
       setPaymentsLoading(false);
     }
-  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   // ── Payment Stats 로드 ──
@@ -3387,7 +3386,7 @@ export default function AdminPage() {
                     </div>
                   </div>
                   {/* 필터 탭 */}
-                  <div className={`px-5 py-2.5 border-b ${t.borderSub} flex items-center gap-1 overflow-x-auto`}>
+                  <div className={`px-5 py-2.5 border-b ${t.border} flex items-center gap-1 overflow-x-auto`}>
                     {(['all', 'open', 'in_progress', 'resolved', 'closed'] as const).map((f) => (
                       <button
                         key={f}

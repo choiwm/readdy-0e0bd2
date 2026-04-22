@@ -159,8 +159,8 @@ export default function GradePermissionsPanel({ isDark, onToast }: GradePermissi
     try {
       const payload = {
         ...editingPerms,
-        grade_label: labelValue || editingPerms.grade_label,
-        grade_description: descValue || editingPerms.grade_description,
+        grade_label: labelValue || editingPerms.grade_label || '',
+        grade_description: descValue || editingPerms.grade_description || '',
       };
       const res = await fetch(
         `${import.meta.env.VITE_PUBLIC_SUPABASE_URL}/functions/v1/admin-users?action=update_grade_permissions`,

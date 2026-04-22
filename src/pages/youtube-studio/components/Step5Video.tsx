@@ -141,7 +141,6 @@ export default function Step5Video({ onNext, onBack, voiceData, initialCuts: ini
     if (initialCutsProp !== undefined) {
       setCuts(initialCutsProp.length > 0 ? initialCutsProp : initialCuts);
     }
-  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [initialCutsProp]);
 
   // ── Step4 이미지가 업데이트되면 cuts의 thumb 자동 동기화 ──────────────

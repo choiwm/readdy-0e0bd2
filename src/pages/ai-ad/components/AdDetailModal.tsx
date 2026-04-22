@@ -572,10 +572,10 @@ export default function AdDetailModal({ template, productName, productDesc, side
 
     let notifId: string | undefined;
     try {
-      notifId = await sendGenerationInProgress({
+      notifId = (await sendGenerationInProgress({
         generation_type: type,
         model_name: hasProductImage ? `AI Ad ${type === 'image' ? 'Image' : 'Video'} (제품 이미지 반영)` : `AI Ad ${type === 'image' ? 'Image' : 'Video'}`,
-      });
+      })) ?? undefined;
     } catch { /* 무시 */ }
 
     // stepTimerRef는 사용하지 않음 — 실제 작업 단계에서 setGenStep을 직접 호출

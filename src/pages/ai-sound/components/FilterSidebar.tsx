@@ -40,7 +40,7 @@ interface FilterSidebarProps {
   activeIcon: SidebarIcon;
   setActiveIcon: (i: SidebarIcon) => void;
   selectedVoice: Voice | null;
-  starredIds: Set<number>;
+  starredIds: Set<string | number>;
   langFilters: Set<string>;
   setLangFilters: (f: Set<string>) => void;
   credits: number;

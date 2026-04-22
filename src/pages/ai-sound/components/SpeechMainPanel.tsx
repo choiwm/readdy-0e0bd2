@@ -131,7 +131,10 @@ export default function SpeechMainPanel({
       signal.addEventListener('abort', () => reject(new Error('aborted')), { once: true });
     });
 
-    const { data, error: invokeError } = await Promise.race([invokePromise, abortPromise]) as Awaited<ReturnType<typeof supabase.functions.invoke>>;
+    const { data, error: invokeError } = (await Promise.race([invokePromise, abortPromise])) as {
+      data: { error?: string; audioUrl?: string; audioBase64?: string; mimeType?: string } | null;
+      error: { message?: string } | null;
+    };
 
     if (invokeError) throw new Error(invokeError.message ?? '서버 오류');
     if (data?.error) throw new Error(data.error);

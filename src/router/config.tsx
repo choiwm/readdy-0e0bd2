@@ -1,21 +1,23 @@
+import { lazy } from "react";
 import type { RouteObject } from "react-router-dom";
-import NotFound from "../pages/NotFound";
 import Home from "../pages/home/page";
-import AICreate from "../pages/ai-create/page";
-import AIAutomation from "../pages/ai-automation/page";
-import AISound from "../pages/ai-sound/page";
-import AIBoard from "../pages/ai-board/page";
-import AIAd from "../pages/ai-ad/page";
-import AIShortcuts from "../pages/ai-shortcuts/page";
-import YoutubeStudio from "../pages/youtube-studio/page";
-import Workflow from "../pages/workflow/page";
-import Terms from "../pages/terms/page";
-import Privacy from "../pages/privacy/page";
-import CustomerSupport from "../pages/customer-support/page";
-import Admin from "../pages/admin/page";
-import AdminLogin from "../pages/admin-login/page";
-import CreditPurchase from "../pages/credit-purchase/page";
+import NotFound from "../pages/NotFound";
 import AdminGuard from "../components/feature/AdminGuard";
+
+const AICreate = lazy(() => import("../pages/ai-create/page"));
+const AIAutomation = lazy(() => import("../pages/ai-automation/page"));
+const AISound = lazy(() => import("../pages/ai-sound/page"));
+const AIBoard = lazy(() => import("../pages/ai-board/page"));
+const AIAd = lazy(() => import("../pages/ai-ad/page"));
+const AIShortcuts = lazy(() => import("../pages/ai-shortcuts/page"));
+const YoutubeStudio = lazy(() => import("../pages/youtube-studio/page"));
+const Workflow = lazy(() => import("../pages/workflow/page"));
+const Terms = lazy(() => import("../pages/terms/page"));
+const Privacy = lazy(() => import("../pages/privacy/page"));
+const CustomerSupport = lazy(() => import("../pages/customer-support/page"));
+const Admin = lazy(() => import("../pages/admin/page"));
+const AdminLogin = lazy(() => import("../pages/admin-login/page"));
+const CreditPurchase = lazy(() => import("../pages/credit-purchase/page"));
 
 const routes: RouteObject[] = [
   {

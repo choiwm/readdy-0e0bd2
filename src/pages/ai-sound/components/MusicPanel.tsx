@@ -483,7 +483,10 @@ export default function MusicPanel({
         abortSignal.addEventListener('abort', () => reject(new Error('aborted')), { once: true });
       });
 
-      const { data, error: invokeError } = await Promise.race([invokePromise, abortPromise]) as Awaited<ReturnType<typeof supabase.functions.invoke>>;
+      const { data, error: invokeError } = (await Promise.race([invokePromise, abortPromise])) as {
+        data: { success?: boolean; error?: string; clips?: MusicClip[] } | null;
+        error: { message?: string } | null;
+      };
 
       if (invokeError) {
         throw new Error(invokeError.message ?? '서버 오류');
@@ -492,7 +495,7 @@ export default function MusicPanel({
         throw new Error(data.error);
       }
 
-      if (data.success && data.clips?.length > 0) {
+      if (data?.success && data.clips && data.clips.length > 0) {
         const clips: MusicClip[] = data.clips;
         setGeneratedClips((prev) => [...clips, ...prev]);
 
@@ -833,7 +836,7 @@ export default function MusicPanel({
             </button>
           )}
           <button
-            onClick={handleGenerate}
+            onClick={() => handleGenerate()}
             disabled={!canGenerate}
             className="flex-1 flex items-center justify-center gap-2 py-2.5 md:py-3.5 bg-gradient-to-r from-indigo-500 to-violet-500 hover:from-indigo-400 hover:to-violet-400 disabled:opacity-40 disabled:cursor-not-allowed text-white font-bold text-xs md:text-sm rounded-xl transition-all cursor-pointer whitespace-nowrap"
           >

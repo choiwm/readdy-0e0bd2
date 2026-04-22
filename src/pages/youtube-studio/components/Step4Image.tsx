@@ -457,7 +457,6 @@ export default function Step4Image({
     if (initialCutsProp !== undefined) {
       setCuts(initialCutsProp.length > 0 ? initialCutsProp : initialCuts);
     }
-  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [initialCutsProp]);
   const [selectedCut, setSelectedCut] = useState<number>(1);
   const [imageModel, setImageModel] = useState('Flux Realism');
