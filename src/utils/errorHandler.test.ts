@@ -1,5 +1,6 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import {
+  logError,
   normalizeError,
   getUserMessage,
   subscribeToasts,
@@ -76,5 +77,38 @@ describe("toast bus", () => {
 
     spy.mockRestore();
     unsub();
+  });
+
+  it("respects the custom durationMs on emitted toasts", () => {
+    const received: ToastMessage[] = [];
+    const unsub = subscribeToasts((t) => received.push(t));
+    toast("long", "info", 7500);
+    expect(received[0].durationMs).toBe(7500);
+    unsub();
+  });
+});
+
+describe("logError", () => {
+  it("uses console.error for error level", () => {
+    const spy = vi.spyOn(console, "error").mockImplementation(() => {});
+    logError(new Error("bad"), { where: "x" }, "error");
+    expect(spy).toHaveBeenCalled();
+    spy.mockRestore();
+  });
+
+  it("uses console.warn for warn level", () => {
+    const spy = vi.spyOn(console, "warn").mockImplementation(() => {});
+    logError("heads up", undefined, "warn");
+    expect(spy).toHaveBeenCalled();
+    spy.mockRestore();
+  });
+
+  it("returns the normalized shape", () => {
+    const spy = vi.spyOn(console, "error").mockImplementation(() => {});
+    const err = new Error("db");
+    const out = logError(err, { op: "read" });
+    expect(out.message).toBe("db");
+    expect(out.context).toEqual({ op: "read" });
+    spy.mockRestore();
   });
 });

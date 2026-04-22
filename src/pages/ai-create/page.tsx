@@ -11,7 +11,7 @@ import AngleView from './components/AngleView';
 import AppNavbar from '@/components/feature/AppNavbar';
 import PageHeader from '@/components/feature/PageHeader';
 import EmptyState from '@/components/base/EmptyState';
-import { getCharacterAppearanceTags, type AppliedAngle, type AppliedLook } from '@/utils/characterPrompt';
+import { type AppliedAngle, type AppliedLook } from '@/utils/characterPrompt';
 import { useCredits } from '@/hooks/useCredits';
 import { useAuth } from '@/hooks/useAuth';
 

@@ -21,7 +21,6 @@ import { getAuthorizationHeader } from '@/lib/env';
 // ── Types ──────────────────────────────────────────────────────────────────
 type TabType = 'overview' | 'users' | 'coin-grant' | 'content' | 'ai-engine' | 'billing' | 'cs' | 'cs-notice' | 'audit' | 'sys-settings' | 'security' | 'grade-settings';
 type UserStatus = 'active' | 'inactive' | 'suspended';
-type ContentStatus = 'approved' | 'pending' | 'blocked';
 
 
 // ── Mock Data (일부 실시간 불가 항목은 제거됨) ─────────────────────────────

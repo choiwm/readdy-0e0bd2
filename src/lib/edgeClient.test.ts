@@ -117,3 +117,51 @@ describe("EdgeCallError", () => {
     expect(err.message).toBe("nope");
   });
 });
+
+describe("callEdge query serialization", () => {
+  const originalFetch = globalThis.fetch;
+  afterEach(() => { globalThis.fetch = originalFetch; });
+
+  it("appends truthy query params to the URL and skips undefined", async () => {
+    const fetchSpy = vi.fn(async (url: Parameters<typeof fetch>[0]) => {
+      const str = url instanceof URL ? url.toString() : String(url);
+      expect(str).toContain("action=list");
+      expect(str).toContain("limit=40");
+      expect(str).toContain("sort=asc");
+      expect(str).not.toContain("missing=");
+      return { ok: true, status: 200, text: async () => "null" } as unknown as Response;
+    }) as typeof fetch;
+    globalThis.fetch = fetchSpy;
+
+    await callEdge("demo", {
+      method: "GET",
+      query: { action: "list", limit: 40, sort: "asc", missing: undefined },
+    });
+    expect(fetchSpy).toHaveBeenCalledOnce();
+  });
+});
+
+describe("callEdge body handling", () => {
+  const originalFetch = globalThis.fetch;
+  afterEach(() => { globalThis.fetch = originalFetch; });
+
+  it("sends JSON body when provided", async () => {
+    const fetchSpy = vi.fn(async (_url: Parameters<typeof fetch>[0], init?: Parameters<typeof fetch>[1]) => {
+      expect(init?.body).toBe(JSON.stringify({ a: 1 }));
+      return { ok: true, status: 200, text: async () => "null" } as unknown as Response;
+    }) as typeof fetch;
+    globalThis.fetch = fetchSpy;
+
+    await callEdge("demo", { body: { a: 1 } });
+  });
+
+  it("returns null when response body is empty", async () => {
+    globalThis.fetch = vi.fn(async () => ({
+      ok: true,
+      status: 200,
+      text: async () => "",
+    }) as unknown as Response) as typeof fetch;
+    const result = await callEdge("demo");
+    expect(result).toBeNull();
+  });
+});

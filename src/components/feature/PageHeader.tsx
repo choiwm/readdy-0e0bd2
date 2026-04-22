@@ -48,10 +48,10 @@ const BADGE_STYLES: Record<BadgeColor, string> = {
 
 
 export default function PageHeader({
-  icon,
+  icon: _icon,
   title,
   subtitle,
-  statusLabel,
+  statusLabel: _statusLabel,
   badge,
   badgeColor = 'indigo',
   actions,

@@ -209,35 +209,6 @@ function buildOptimizedPrompt(
   return prompt;
 }
 
-// ── Build image URL from prompt + style ───────────────────────────────────
-function buildImageUrl(
-  cutId: number,
-  prompt: string,
-  styleId: string | null,
-  keywords: string[],
-  seq: string,
-): string {
-  // If prompt is empty, build from scratch using style + keywords
-  let finalPrompt = prompt.trim();
-  if (!finalPrompt) {
-    finalPrompt = buildOptimizedPrompt(cutId, styleId, keywords);
-  } else {
-    // Inject style modifier into existing prompt if style is selected
-    const modifier = styleId ? stylePromptModifiers[styleId] : null;
-    if (modifier) {
-      // Only inject if modifier prefix not already present
-      const alreadyHasStyle = finalPrompt.toLowerCase().includes(modifier.prefix.slice(0, 20).toLowerCase());
-      if (!alreadyHasStyle) {
-        finalPrompt = `${modifier.prefix} ${finalPrompt}${modifier.suffix}`;
-      }
-    }
-  }
-
-  // Encode and build URL
-  const encoded = encodeURIComponent(finalPrompt);
-  return `https://readdy.ai/api/search-image?query=$%7Bencoded%7D&width=480&height=270&seq=${seq}&orientation=landscape`;
-}
-
 interface Step4ImageProps {
   onNext: (images: string[], cuts?: Cut[]) => void;
   onBack: () => void;
@@ -447,7 +418,7 @@ function PromptOptimizePanel({
 // ── Main Component ─────────────────────────────────────────────────────────
 export default function Step4Image({
   onNext, onBack, selectedStyle, selectedRatio, onGoToStep1, onStyleChange,
-  selectedKeywords = [], channelName = '', initialCuts: initialCutsProp,
+  selectedKeywords = [], channelName: _channelName = '', initialCuts: initialCutsProp,
 }: Step4ImageProps) {
   const [cuts, setCuts] = useState<Cut[]>(initialCutsProp ?? initialCuts);
 

@@ -404,7 +404,7 @@ interface EmbeddedYouTubeStudioProps {
   sidebarVoiceId?: string;
 }
 
-function EmbeddedYouTubeStudio({ addProject, initialProject, onBack, resumeStep, sidebarStyle, sidebarRatio, sidebarVoiceId }: EmbeddedYouTubeStudioProps) {
+function EmbeddedYouTubeStudio({ addProject, initialProject, onBack, resumeStep, sidebarStyle, sidebarRatio, sidebarVoiceId: _sidebarVoiceId }: EmbeddedYouTubeStudioProps) {
   // initialProject가 있으면 resumeStep 또는 Step2로 바로 시작
   const [currentStep, setCurrentStep] = useState(() => {
     if (!initialProject) return 1;

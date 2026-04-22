@@ -25,5 +25,16 @@ export default defineConfig({
       VITE_PUBLIC_SUPABASE_URL: "https://test.supabase.co",
       VITE_PUBLIC_SUPABASE_ANON_KEY: "test-anon-key",
     },
+    coverage: {
+      provider: "v8",
+      reporter: ["text", "html"],
+      include: [
+        "src/lib/**/*.{ts,tsx}",
+        "src/utils/**/*.{ts,tsx}",
+        "src/components/base/**/*.{ts,tsx}",
+        "src/pages/admin/components/NotificationPanel.tsx",
+      ],
+      exclude: ["**/*.test.{ts,tsx}", "src/test/**"],
+    },
   },
 });
