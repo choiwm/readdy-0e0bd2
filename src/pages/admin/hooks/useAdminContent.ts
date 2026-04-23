@@ -1,7 +1,21 @@
 import { useCallback, useState } from 'react';
 import { getAuthorizationHeader } from '@/lib/env';
+import { supabase } from '@/lib/supabase';
 import type { TeamRecord } from '../types';
 import type { ContentDbItem, ContentDbStats, TeamStats } from '../components/ContentTab';
+
+type ContentStatus = 'approved' | 'pending' | 'blocked';
+
+interface ContentMockItem {
+  id: string;
+  title: string;
+  user: string;
+  type: string;
+  status: ContentStatus;
+  date: string;
+  rating: number;
+  thumbnail: string;
+}
 
 const CONTENT_URL = `${import.meta.env.VITE_PUBLIC_SUPABASE_URL}/functions/v1/admin-content`;
 const TEAMS_URL = `${import.meta.env.VITE_PUBLIC_SUPABASE_URL}/functions/v1/admin-teams`;
@@ -79,6 +93,40 @@ export function useAdminContent() {
     }
   }, []);
 
+  const updateContentStatus = useCallback(async (
+    contentId: string,
+    status: ContentStatus,
+    setContentItems: (updater: (prev: ContentMockItem[]) => ContentMockItem[]) => void,
+  ): Promise<{ status: ContentStatus }> => {
+    setContentItems((prev) => prev.map((c) => c.id === contentId ? { ...c, status } : c));
+    setContentDbItems((prev) => prev.map((c) => c.id === contentId ? { ...c, status } : c));
+
+    const dbStatus = status === 'approved' ? 'completed' : status === 'blocked' ? 'failed' : 'processing';
+
+    try {
+      const [audioRes, autoRes] = await Promise.allSettled([
+        supabase.from('audio_history').update({ status: dbStatus }).eq('id', contentId),
+        supabase.from('automation_projects').update({ status: dbStatus }).eq('id', contentId),
+      ]);
+
+      const auditLabel = status === 'approved' ? '콘텐츠 승인' : status === 'blocked' ? '콘텐츠 차단' : '콘텐츠 검토중';
+      await supabase.from('audit_logs').insert({
+        admin_email: 'admin',
+        action: auditLabel,
+        target_type: 'content',
+        target_id: contentId,
+        target_label: contentId,
+        result: 'success',
+      });
+
+      console.log('Content status updated:', audioRes, autoRes);
+    } catch (e) {
+      console.warn('Content status DB update failed:', e);
+    }
+
+    return { status };
+  }, []);
+
   return {
     contentDbItems,
     setContentDbItems,
@@ -91,5 +139,6 @@ export function useAdminContent() {
     loadContentItems,
     loadContentStats,
     loadTeams,
+    updateContentStatus,
   };
 }

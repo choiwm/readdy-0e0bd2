@@ -35,6 +35,7 @@ import { useAdminOverview } from './hooks/useAdminOverview';
 import { useAdminContent } from './hooks/useAdminContent';
 import { useAdminAiEngine } from './hooks/useAdminAiEngine';
 import { useAdminSecurity } from './hooks/useAdminSecurity';
+import { useAdminSysSettings } from './hooks/useAdminSysSettings';
 import { getAuthorizationHeader } from '@/lib/env';
 
 // ── Types ──────────────────────────────────────────────────────────────────
@@ -176,7 +177,7 @@ export default function AdminPage() {
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [isDark, setIsDark] = useState(true);
   const {
-    usersData, setUsersData,
+    usersData,
     usersLoading,
     userStats,
     userSearch, setUserSearch,
@@ -184,6 +185,7 @@ export default function AdminPage() {
     userGradeFilter, setUserGradeFilter,
     userSearchDebounceRef,
     loadUsers, loadUserStats,
+    updateUserStatus, adjustCredits, updateMemberGrade,
   } = useAdminUsers();
   const [gradeChangeModal, setGradeChangeModal] = useState<UserRecord | null>(null);
   const [gradeChangeValue, setGradeChangeValue] = useState('general');
@@ -191,10 +193,7 @@ export default function AdminPage() {
   const [contentFilter, setContentFilter] = useState('전체');
   const [selectedUser, setSelectedUser] = useState<UserRecord | null>(null);
   const [_revenueRange, _setRevenueRange] = useState<'daily' | 'weekly' | 'monthly'>('monthly');
-  const [noticeModal, setNoticeModal] = useState(false);
-  const [newNoticeTitle, setNewNoticeTitle] = useState('');
-  const [newNoticeType, setNewNoticeType] = useState('업데이트');
-  // couponModal/Code/Discount/DiscountType/MaxUses/Expires now come from useAdminBilling
+  // noticeModal/newNoticeTitle/newNoticeType, coupon state now come from hooks
   const [notifOpen, setNotifOpen] = useState(false);
   const [notifications, setNotifications] = useState<Notification[]>(initialNotifications);
   const notifBtnRef = useRef<HTMLButtonElement>(null);
@@ -264,14 +263,33 @@ export default function AdminPage() {
 
   // ── Content / Teams ──
   const {
-    contentDbItems, setContentDbItems,
+    contentDbItems,
     contentDbStats,
     contentDbLoading,
     teamsData,
     teamsLoading,
     teamStats,
     loadContentItems, loadContentStats, loadTeams,
+    updateContentStatus,
   } = useAdminContent();
+
+  // ── Notice / Sys-settings ──
+  const {
+    noticeModal, setNoticeModal,
+    newNoticeTitle, setNewNoticeTitle,
+    newNoticeType, setNewNoticeType,
+    retentionEdit, setRetentionEdit,
+    retentionValues, setRetentionValues,
+    maintenanceMode, setMaintenanceMode,
+    maxConcurrent, setMaxConcurrent,
+    sessionTimeout, setSessionTimeout,
+    watermarkDefault, setWatermarkDefault,
+    autoBlock, setAutoBlock,
+    emailNotif, setEmailNotif,
+    slackNotif, setSlackNotif,
+    slackWebhookUrl, setSlackWebhookUrl,
+    contentAutoFilter, setContentAutoFilter,
+  } = useAdminSysSettings();
 
   // paymentsPage/Total/TotalPages + PAYMENTS_PAGE_SIZE now come from useAdminBilling
   const paymentsPage = paymentsPageFromHook;
@@ -591,38 +609,9 @@ export default function AdminPage() {
     addToast(`${payId} 환불 처리됐습니다`, 'success');
   };
 
-  // Content: status change → DB 반영 (audio_history, automation_projects 상태 업데이트)
+  // Content: status change (hook 위임 + 토스트)
   const handleContentStatus = async (contentId: string, status: 'approved' | 'pending' | 'blocked') => {
-    // 로컬 state 낙관적 업데이트
-    setContentItems((prev) => prev.map((c) => c.id === contentId ? { ...c, status } : c));
-    setContentDbItems((prev) => prev.map((c) => c.id === contentId ? { ...c, status } : c));
-
-    // DB 상태 매핑: approved→completed, pending→processing, blocked→failed
-    const dbStatus = status === 'approved' ? 'completed' : status === 'blocked' ? 'failed' : 'processing';
-
-    // audio_history 또는 automation_projects 업데이트 시도
-    try {
-      const [audioRes, autoRes] = await Promise.allSettled([
-        supabase.from('audio_history').update({ status: dbStatus }).eq('id', contentId),
-        supabase.from('automation_projects').update({ status: dbStatus }).eq('id', contentId),
-      ]);
-
-      // 감사 로그 기록
-      const label = status === 'approved' ? '콘텐츠 승인' : status === 'blocked' ? '콘텐츠 차단' : '콘텐츠 검토중';
-      await supabase.from('audit_logs').insert({
-        admin_email: 'admin',
-        action: label,
-        target_type: 'content',
-        target_id: contentId,
-        target_label: contentId,
-        result: 'success',
-      });
-
-      console.log('Content status updated:', audioRes, autoRes);
-    } catch (e) {
-      console.warn('Content status DB update failed:', e);
-    }
-
+    await updateContentStatus(contentId, status, setContentItems);
     const label = status === 'approved' ? '승인' : status === 'blocked' ? '차단' : '검토중';
     addToast(`콘텐츠 ${contentId}이 ${label}됐습니다`, status === 'blocked' ? 'warning' : 'success');
   };
@@ -661,25 +650,11 @@ export default function AdminPage() {
     addToast(`관리자 ${result.name} 계정이 생성됐습니다`, 'success');
   };
 
-  // Users: member grade change (Edge Function)
+  // Users: member grade change (hook 위임 + 토스트)
   const handleGradeChange = async (userId: string, memberGrade: string, reason?: string) => {
-    try {
-      const url = new URL(`${import.meta.env.VITE_PUBLIC_SUPABASE_URL}/functions/v1/admin-users`);
-      url.searchParams.set('action', 'update_member_grade');
-      await fetch(url.toString(), {
-        method: 'PATCH',
-        headers: {
-          'Authorization': getAuthorizationHeader(),
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({ id: userId, member_grade: memberGrade, reason }),
-      });
-      setUsersData((prev) => prev.map((u) => u.id === userId ? { ...u, memberGrade } : u));
-    } catch (e) {
-      console.warn('Grade change failed:', e);
-    }
-    const gradeMeta = GRADE_META[memberGrade];
-    addToast(`등급이 ${gradeMeta?.label ?? memberGrade}(으)로 변경됐습니다`, 'success');
+    const { grade } = await updateMemberGrade(userId, memberGrade, reason);
+    const gradeMeta = GRADE_META[grade];
+    addToast(`등급이 ${gradeMeta?.label ?? grade}(으)로 변경됐습니다`, 'success');
   };
 
   // Sys-settings: save performance settings
@@ -693,51 +668,21 @@ export default function AdminPage() {
     setTimeout(() => addToast('CSV 파일이 다운로드됐습니다', 'success'), 800);
   };
 
-  // Users: suspend / restore (Edge Function)
+  // Users: suspend / restore (hook 위임 + 토스트)
   const handleUserStatusChange = async (userId: string, newStatus: UserStatus) => {
-    try {
-      const url = new URL(`${import.meta.env.VITE_PUBLIC_SUPABASE_URL}/functions/v1/admin-users`);
-      url.searchParams.set('action', 'update_user_status');
-      await fetch(url.toString(), {
-        method: 'PATCH',
-        headers: {
-          'Authorization': getAuthorizationHeader(),
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({ id: userId, status: newStatus }),
-      });
-      // 목록 갱신
-      setUsersData((prev) => prev.map((u) => u.id === userId ? { ...u, status: newStatus } : u));
-    } catch (e) {
-      console.warn('User status update failed:', e);
-    }
+    await updateUserStatus(userId, newStatus);
     addToast(
       newStatus === 'suspended' ? `계정이 정지됐습니다` : `계정이 복구됐습니다`,
       newStatus === 'suspended' ? 'warning' : 'success',
     );
   };
 
-  // Users: credit adjust (Edge Function)
+  // Users: credit adjust (hook 위임 + 토스트)
   const handleCreditAdjust = async (userId: string, amount: string) => {
-    if (!amount.trim()) { addToast('조정 값을 입력해주세요', 'error'); return; }
-    const numAmount = parseInt(amount);
-    if (isNaN(numAmount)) { addToast('올바른 숫자를 입력해주세요', 'error'); return; }
-    try {
-      const url = new URL(`${import.meta.env.VITE_PUBLIC_SUPABASE_URL}/functions/v1/admin-users`);
-      url.searchParams.set('action', 'adjust_credits');
-      await fetch(url.toString(), {
-        method: 'POST',
-        headers: {
-          'Authorization': getAuthorizationHeader(),
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({ id: userId, amount: numAmount }),
-      });
-      setUsersData((prev) => prev.map((u) => u.id === userId ? { ...u, credits: Math.max(0, u.credits + numAmount) } : u));
-    } catch (e) {
-      console.warn('Credit adjust failed:', e);
-    }
-    addToast(`크레딧 ${numAmount > 0 ? '+' : ''}${numAmount} 조정됐습니다`, 'success');
+    const result = await adjustCredits(userId, amount);
+    if (!result.ok) { addToast(result.error ?? '조정 실패', 'error'); return; }
+    const n = result.amount ?? 0;
+    addToast(`크레딧 ${n > 0 ? '+' : ''}${n} 조정됐습니다`, 'success');
   };
 
   // Billing: refund (Edge Function)
@@ -817,17 +762,7 @@ export default function AdminPage() {
   const [addAdminModal, setAddAdminModal] = useState(false);
   const [editPermModal, setEditPermModal] = useState<AdminAccount | null>(null);
   const [editPermList, setEditPermList] = useState<string[]>([]);
-  const [retentionEdit, setRetentionEdit] = useState(false);
-  const [retentionValues, setRetentionValues] = useState({ audit: '365일', content: '90일', billing: '5년' });
-  const [maintenanceMode, setMaintenanceMode] = useState(false);
-  const [maxConcurrent, setMaxConcurrent] = useState('800');
-  const [sessionTimeout, setSessionTimeout] = useState('30');
-  const [watermarkDefault, setWatermarkDefault] = useState(true);
-  const [autoBlock, setAutoBlock] = useState(true);
-  const [emailNotif, setEmailNotif] = useState(true);
-  const [slackNotif, setSlackNotif] = useState(false);
-  const [slackWebhookUrl, setSlackWebhookUrl] = useState('');
-  const [contentAutoFilter, setContentAutoFilter] = useState(true);
+  // retention/maintenance/slack/email/etc. now come from useAdminSysSettings
 
   // couponDiscountType/MaxUses/Expires now from useAdminBilling
 

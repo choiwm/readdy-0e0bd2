@@ -83,6 +83,78 @@ export function useAdminUsers() {
     }
   }, []);
 
+  const updateUserStatus = useCallback(async (
+    userId: string,
+    newStatus: UserRecord['status'],
+  ): Promise<{ status: UserRecord['status'] }> => {
+    try {
+      const url = new URL(USERS_URL);
+      url.searchParams.set('action', 'update_user_status');
+      await fetch(url.toString(), {
+        method: 'PATCH',
+        headers: {
+          Authorization: getAuthorizationHeader(),
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ id: userId, status: newStatus }),
+      });
+      setUsersData((prev) => prev.map((u) => u.id === userId ? { ...u, status: newStatus } : u));
+    } catch (e) {
+      console.warn('User status update failed:', e);
+    }
+    return { status: newStatus };
+  }, []);
+
+  const adjustCredits = useCallback(async (
+    userId: string,
+    amount: string,
+  ): Promise<{ ok: boolean; amount?: number; error?: string }> => {
+    if (!amount.trim()) return { ok: false, error: '조정 값을 입력해주세요' };
+    const numAmount = parseInt(amount);
+    if (isNaN(numAmount)) return { ok: false, error: '올바른 숫자를 입력해주세요' };
+    try {
+      const url = new URL(USERS_URL);
+      url.searchParams.set('action', 'adjust_credits');
+      await fetch(url.toString(), {
+        method: 'POST',
+        headers: {
+          Authorization: getAuthorizationHeader(),
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ id: userId, amount: numAmount }),
+      });
+      setUsersData((prev) => prev.map((u) => u.id === userId
+        ? { ...u, credits: Math.max(0, u.credits + numAmount) }
+        : u));
+    } catch (e) {
+      console.warn('Credit adjust failed:', e);
+    }
+    return { ok: true, amount: numAmount };
+  }, []);
+
+  const updateMemberGrade = useCallback(async (
+    userId: string,
+    memberGrade: string,
+    reason?: string,
+  ): Promise<{ grade: string }> => {
+    try {
+      const url = new URL(USERS_URL);
+      url.searchParams.set('action', 'update_member_grade');
+      await fetch(url.toString(), {
+        method: 'PATCH',
+        headers: {
+          Authorization: getAuthorizationHeader(),
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ id: userId, member_grade: memberGrade, reason }),
+      });
+      setUsersData((prev) => prev.map((u) => u.id === userId ? { ...u, memberGrade } : u));
+    } catch (e) {
+      console.warn('Grade change failed:', e);
+    }
+    return { grade: memberGrade };
+  }, []);
+
   return {
     usersData,
     setUsersData,
@@ -97,5 +169,8 @@ export function useAdminUsers() {
     userSearchDebounceRef,
     loadUsers,
     loadUserStats,
+    updateUserStatus,
+    adjustCredits,
+    updateMemberGrade,
   };
 }
