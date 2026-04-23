@@ -188,3 +188,32 @@ try {
   throw e;
 }
 ```
+
+## 검증 스냅샷 (2026-04-23)
+
+`for fn in supabase/functions/*/index.ts` 자동 스캔 결과:
+
+| 항목 | 결과 |
+|------|------|
+| `_shared/auth.ts` 헬퍼 호출 함수 수 | **30 / 30** |
+| `AuthFailure` 캐치 처리 | **30 / 30** |
+| `requireAdmin` 적용 함수 (admin-* 9개 + cron-manager + healthcheck-scheduler + fal-key-manager + fal-model-catalog + test-fal-key = 14개) | **14 / 14** |
+| `requireUser` 적용 함수 (generate-* 9개 + analyze-video-sfx + check-fal-status + clean-audio + summarize-text + translate-text + credit-alert-* 2개 = 16개) | **16 / 16** |
+| `requireSchedulerSecret` 적용 (cron-manager, healthcheck-scheduler) | **2 / 2** |
+
+### 미해결 위생 항목 (MEDIUM)
+
+- **`writeAuditLog` 미사용**: `_shared/auth.ts`에 정의된 공통 헬퍼를 어떤 함수도 호출하지 않음. 각 admin-* 함수가 `audit_logs` 테이블에 직접 insert 중 (총 inserts: admin-cs 6, admin-users 6, admin-billing 4, admin-security 4, admin-audit 3, admin-stats 1, admin-teams 1, admin-api-keys 1; admin-content는 read-only). → 후속 리팩토링 대상.
+- **읽기 전용 admin-content / admin-stats**: 파괴적 호출 없음. 현 상태 OK.
+
+자동 검증 명령:
+
+```bash
+for fn in supabase/functions/*/index.ts; do
+  name=$(basename $(dirname "$fn"))
+  invokes=$(grep -cE "(await\s+(requireUser|requireAdmin)\(|requireSchedulerSecret\()" "$fn")
+  authfail=$(grep -c "AuthFailure" "$fn")
+  echo "$name : invocations=$invokes AuthFailure_handling=$authfail"
+done
+```
+

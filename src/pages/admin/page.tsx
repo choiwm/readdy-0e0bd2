@@ -10,7 +10,7 @@ import AuditAlertSettingsModal, { type AuditAlertRule } from './components/Audit
 import AiEngineTab from './components/AiEngineTab';
 import TeamManageModal from './components/TeamManageModal';
 import CreditGrantPanel from './components/CreditGrantPanel';
-import type { CsTicket, Notice, PromptTemplate, IpBlock, AdminAccount, TeamRecord } from './types';
+import type { CsTicket, Notice, PromptTemplate, AdminAccount, TeamRecord } from './types';
 import { apiStatus, contentTrends, dailySignups, planDist, auditLogs } from './mockData';
 import { StatusBadge, PlanBadge } from './components/Badges';
 import NotificationPanel, { type Notification, initialNotifications } from './components/NotificationPanel';
@@ -34,6 +34,7 @@ import { useAdminUsers } from './hooks/useAdminUsers';
 import { useAdminOverview } from './hooks/useAdminOverview';
 import { useAdminContent } from './hooks/useAdminContent';
 import { useAdminAiEngine } from './hooks/useAdminAiEngine';
+import { useAdminSecurity } from './hooks/useAdminSecurity';
 import { getAuthorizationHeader } from '@/lib/env';
 
 // ── Types ──────────────────────────────────────────────────────────────────
@@ -191,11 +192,9 @@ export default function AdminPage() {
   const [selectedUser, setSelectedUser] = useState<UserRecord | null>(null);
   const [_revenueRange, _setRevenueRange] = useState<'daily' | 'weekly' | 'monthly'>('monthly');
   const [noticeModal, setNoticeModal] = useState(false);
-  const [couponModal, setCouponModal] = useState(false);
   const [newNoticeTitle, setNewNoticeTitle] = useState('');
   const [newNoticeType, setNewNoticeType] = useState('업데이트');
-  const [couponCode, setCouponCode] = useState('');
-  const [couponDiscount, setCouponDiscount] = useState('');
+  // couponModal/Code/Discount/DiscountType/MaxUses/Expires now come from useAdminBilling
   const [notifOpen, setNotifOpen] = useState(false);
   const [notifications, setNotifications] = useState<Notification[]>(initialNotifications);
   const notifBtnRef = useRef<HTMLButtonElement>(null);
@@ -219,9 +218,26 @@ export default function AdminPage() {
     paymentsTotal: paymentsTotalFromHook,
     paymentsTotalPages: paymentsTotalPagesFromHook,
     paymentStats,
-    couponsData, setCouponsData,
+    couponsData,
     loadPayments, loadPaymentStats, loadCoupons,
+    couponModal, setCouponModal,
+    couponCode, setCouponCode,
+    couponDiscount, setCouponDiscount,
+    couponDiscountType, setCouponDiscountType,
+    couponMaxUses, setCouponMaxUses,
+    couponExpires, setCouponExpires,
+    toggleCoupon: toggleCouponApi,
+    createCoupon: createCouponApi,
   } = useAdminBilling();
+  const {
+    ipBlockInput, setIpBlockInput,
+    ipBlockReason, setIpBlockReason,
+    newAdminName, setNewAdminName,
+    newAdminEmail, setNewAdminEmail,
+    newAdminRole, setNewAdminRole,
+    newAdminPerms, setNewAdminPerms,
+    blockIp, unblockIp, createAdmin,
+  } = useAdminSecurity();
   const {
     auditLogsData,
     auditLogsLoading,
@@ -289,14 +305,8 @@ export default function AdminPage() {
   } = useAdminAiEngine();
 
 
-  // ── Security State ──
-  const [ipBlockList, setIpBlockList] = useState<IpBlock[]>([]);
+  // ── Security State (form/list) now from useAdminSecurity ──
   const [_adminAccounts, setAdminAccounts] = useState<AdminAccount[]>([]);
-  // Add admin form state
-  const [newAdminName, setNewAdminName] = useState('');
-  const [newAdminEmail, setNewAdminEmail] = useState('');
-  const [newAdminRole, setNewAdminRole] = useState('CS Manager');
-  const [newAdminPerms, setNewAdminPerms] = useState<string[]>([]);
 
   // ── Coupon State ──
   const [coupons, setCoupons] = useState([
@@ -562,87 +572,17 @@ export default function AdminPage() {
     }
   };
 
-  // CS: coupon toggle (Edge Function 연동 - code로 토글)
+  // CS: coupon toggle (hook 위임 + 토스트)
   const handleCouponToggle = async (code: string) => {
-    const displayCouponsNow = couponsData.length > 0 ? couponsData : coupons;
-    const coupon = displayCouponsNow.find((c) => c.code === code);
-    const newActive = !coupon?.active;
-
-    // 낙관적 업데이트
-    if (couponsData.length > 0) {
-      setCouponsData((prev) => prev.map((c) => c.code === code ? { ...c, active: newActive } : c));
-    } else {
-      setCoupons((prev) => prev.map((c) => c.code === code ? { ...c, active: newActive } : c));
-    }
-
-    try {
-      const url = new URL(`${import.meta.env.VITE_PUBLIC_SUPABASE_URL}/functions/v1/admin-billing`);
-      url.searchParams.set('action', 'toggle_coupon');
-      await fetch(url.toString(), {
-        method: 'PATCH',
-        headers: {
-          'Authorization': getAuthorizationHeader(),
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({ code, is_active: newActive }),
-      });
-    } catch (e) {
-      console.warn('Coupon toggle failed:', e);
-    }
-
-    addToast(`쿠폰 ${code}이 ${newActive ? '활성화' : '비활성화'}됐습니다`, 'info');
+    const result = await toggleCouponApi(code, coupons, setCoupons);
+    addToast(`쿠폰 ${result.code}이 ${result.active ? '활성화' : '비활성화'}됐습니다`, 'info');
   };
 
-  // Billing: coupon create (Edge Function DB 저장)
+  // Billing: coupon create (hook 위임 + 토스트)
   const handleCouponCreate = async () => {
-    if (!couponCode.trim()) { addToast('쿠폰 코드를 입력해주세요', 'error'); return; }
-    if (!couponDiscount.trim()) { addToast('할인값을 입력해주세요', 'error'); return; }
-    const discountNum = parseFloat(couponDiscount);
-    if (isNaN(discountNum)) { addToast('올바른 숫자를 입력해주세요', 'error'); return; }
-
-    try {
-      const fetchUrl = new URL(`${import.meta.env.VITE_PUBLIC_SUPABASE_URL}/functions/v1/admin-billing`);
-      fetchUrl.searchParams.set('action', 'create_coupon');
-      const res = await fetch(fetchUrl.toString(), {
-        method: 'POST',
-        headers: {
-          'Authorization': getAuthorizationHeader(),
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          code: couponCode.toUpperCase(),
-          discount_type: couponDiscountType === 'percent' ? 'percent' : 'credits',
-          discount_value: discountNum,
-          max_uses: couponMaxUses ? parseInt(couponMaxUses) : null,
-          expires_at: couponExpires ? new Date(couponExpires).toISOString() : null,
-        }),
-      });
-      const data = await res.json();
-      if (data.error) { addToast(`생성 실패: ${data.error}`, 'error'); return; }
-
-      // 목록 새로고침
-      await loadCoupons();
-    } catch (e) {
-      console.warn('Coupon create failed:', e);
-      // 폴백: 로컬 state에 추가
-      const newCoupon = {
-        code: couponCode.toUpperCase(),
-        discount: couponDiscountType === 'percent' ? `${couponDiscount}%` : `${couponDiscount} CR`,
-        type: couponDiscountType === 'percent' ? '구독 할인' : '무료 크레딧',
-        used: 0,
-        limit: couponMaxUses ? parseInt(couponMaxUses) : 999,
-        expires: couponExpires || '무제한',
-        active: true,
-      };
-      setCoupons((prev) => [...prev, newCoupon]);
-    }
-
-    setCouponCode('');
-    setCouponDiscount('');
-    setCouponMaxUses('');
-    setCouponExpires('');
-    setCouponModal(false);
-    addToast(`쿠폰 ${couponCode.toUpperCase()}이 생성됐습니다`, 'success');
+    const result = await createCouponApi(setCoupons);
+    if (!result.ok) { addToast(result.error ?? '생성 실패', 'error'); return; }
+    addToast(`쿠폰 ${result.code}이 생성됐습니다`, 'success');
   };
 
   // CS: payment refund
@@ -699,105 +639,26 @@ export default function AdminPage() {
     addToast(`템플릿 "${template.name}"이 저장됐습니다`, 'success');
   };
 
-  // Security: IP block add (Edge Function)
+  // Security: IP block add (hook 위임 + 토스트)
   const handleIpBlock = async () => {
-    if (!ipBlockInput.trim()) return;
-    try {
-      const url = new URL(`${import.meta.env.VITE_PUBLIC_SUPABASE_URL}/functions/v1/admin-security`);
-      url.searchParams.set('action', 'block_ip');
-      await fetch(url.toString(), {
-        method: 'POST',
-        headers: {
-          'Authorization': getAuthorizationHeader(),
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({ ip_address: ipBlockInput, reason: ipBlockReason || '수동 차단' }),
-      });
-      await loadIpBlocks();
-    } catch (e) {
-      console.warn('IP block failed:', e);
-      const newBlock: IpBlock = {
-        ip: ipBlockInput,
-        reason: ipBlockReason || '수동 차단',
-        blockedAt: new Date().toLocaleString('ko-KR'),
-        blockedBy: 'admin',
-        status: 'active',
-      };
-      setIpBlockList((prev) => [newBlock, ...prev]);
-    }
-    setIpBlockInput('');
-    setIpBlockReason('');
-    addToast(`IP ${ipBlockInput}이 차단됐습니다`, 'warning');
+    const result = await blockIp(ipBlocksData, setIpBlocksData, loadIpBlocks);
+    if (!result) return;
+    addToast(`IP ${result.ip}이 차단됐습니다`, 'warning');
   };
 
-  // Security: IP unblock (Edge Function)
+  // Security: IP unblock (hook 위임 + 토스트)
   const handleIpUnblock = async (ip: string) => {
-    const displayBlocks = ipBlocksData.length > 0 ? ipBlocksData : ipBlockList;
-    const block = displayBlocks.find((b) => b.ip === ip) as (typeof ipBlockList[0] & { _id?: string }) | undefined;
-    if (!block) return;
-    try {
-      const url = new URL(`${import.meta.env.VITE_PUBLIC_SUPABASE_URL}/functions/v1/admin-security`);
-      url.searchParams.set('action', 'unblock_ip');
-      await fetch(url.toString(), {
-        method: 'PATCH',
-        headers: {
-          'Authorization': getAuthorizationHeader(),
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({ id: block._id ?? block.ip }),
-      });
-      if (ipBlocksData.length > 0) {
-        setIpBlocksData((prev) => prev.map((b) => b.ip === ip ? { ...b, status: 'released' as const } : b));
-      } else {
-        setIpBlockList((prev) => prev.map((b) => b.ip === ip ? { ...b, status: 'released' as const } : b));
-      }
-    } catch (e) {
-      console.warn('IP unblock failed:', e);
-      setIpBlockList((prev) => prev.map((b) => b.ip === ip ? { ...b, status: 'released' as const } : b));
-    }
-    addToast(`IP ${ip} 차단이 해제됐습니다`, 'info');
+    const result = await unblockIp(ip, ipBlocksData, setIpBlocksData);
+    if (!result) return;
+    addToast(`IP ${result.ip} 차단이 해제됐습니다`, 'info');
   };
 
-  // Security: add admin (Edge Function)
+  // Security: add admin (hook 위임 + 토스트)
   const handleAddAdmin = async () => {
-    if (!newAdminName.trim() || !newAdminEmail.trim()) return;
-    try {
-      const url = new URL(`${import.meta.env.VITE_PUBLIC_SUPABASE_URL}/functions/v1/admin-security`);
-      url.searchParams.set('action', 'create_admin');
-      await fetch(url.toString(), {
-        method: 'POST',
-        headers: {
-          'Authorization': getAuthorizationHeader(),
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          email: newAdminEmail,
-          display_name: newAdminName,
-          role: newAdminRole,
-          permissions: newAdminPerms.length > 0 ? newAdminPerms : [],
-        }),
-      });
-      await loadAdminAccounts();
-    } catch (e) {
-      console.warn('Add admin failed:', e);
-      const newAdmin: AdminAccount = {
-        id: `ADM-${String(Date.now()).slice(-3)}`,
-        name: newAdminName,
-        email: newAdminEmail,
-        role: newAdminRole,
-        twofa: false,
-        lastLogin: '-',
-        loginIp: '-',
-        permissions: newAdminPerms.length > 0 ? newAdminPerms : ['없음'],
-      };
-      setAdminAccounts((prev) => [...prev, newAdmin]);
-    }
-    setNewAdminName('');
-    setNewAdminEmail('');
-    setNewAdminRole('CS Manager');
-    setNewAdminPerms([]);
+    const result = await createAdmin(setAdminAccounts, loadAdminAccounts);
+    if (!result) return;
     setAddAdminModal(false);
-    addToast(`관리자 ${newAdminName} 계정이 생성됐습니다`, 'success');
+    addToast(`관리자 ${result.name} 계정이 생성됐습니다`, 'success');
   };
 
   // Users: member grade change (Edge Function)
@@ -952,8 +813,7 @@ export default function AdminPage() {
   const [showAuditAlertModal, setShowAuditAlertModal] = useState(false);
   const [auditAlertRules, setAuditAlertRules] = useState<AuditAlertRule[]>([]);
   const activeAlertCount = auditAlertRules.filter((r) => r.enabled).length;
-  const [ipBlockInput, setIpBlockInput] = useState('');
-  const [ipBlockReason, setIpBlockReason] = useState('');
+  // ipBlockInput/ipBlockReason now from useAdminSecurity
   const [addAdminModal, setAddAdminModal] = useState(false);
   const [editPermModal, setEditPermModal] = useState<AdminAccount | null>(null);
   const [editPermList, setEditPermList] = useState<string[]>([]);
@@ -969,10 +829,7 @@ export default function AdminPage() {
   const [slackWebhookUrl, setSlackWebhookUrl] = useState('');
   const [contentAutoFilter, setContentAutoFilter] = useState(true);
 
-  // ── Coupon extra state ──
-  const [couponDiscountType, setCouponDiscountType] = useState<'percent' | 'credits'>('percent');
-  const [couponMaxUses, setCouponMaxUses] = useState('');
-  const [couponExpires, setCouponExpires] = useState('');
+  // couponDiscountType/MaxUses/Expires now from useAdminBilling
 
   // Overview: refresh - 실제 데이터 재로드
   const handleRefresh = useCallback(() => {

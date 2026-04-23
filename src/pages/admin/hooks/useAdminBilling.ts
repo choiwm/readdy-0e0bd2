@@ -16,6 +16,12 @@ const INITIAL_PAYMENT_STATS: PaymentStats = {
 
 const BILLING_URL = `${import.meta.env.VITE_PUBLIC_SUPABASE_URL}/functions/v1/admin-billing`;
 
+interface CouponCreateResult {
+  ok: boolean;
+  code?: string;
+  error?: string;
+}
+
 export function useAdminBilling() {
   const [paymentsData, setPaymentsData] = useState<PaymentRecord[]>([]);
   const [paymentsLoading, setPaymentsLoading] = useState(false);
@@ -24,6 +30,14 @@ export function useAdminBilling() {
   const [paymentsTotalPages, setPaymentsTotalPages] = useState(1);
   const [paymentStats, setPaymentStats] = useState<PaymentStats>(INITIAL_PAYMENT_STATS);
   const [couponsData, setCouponsData] = useState<Coupon[]>([]);
+
+  // ── Coupon create form state ──
+  const [couponModal, setCouponModal] = useState(false);
+  const [couponCode, setCouponCode] = useState('');
+  const [couponDiscount, setCouponDiscount] = useState('');
+  const [couponDiscountType, setCouponDiscountType] = useState<'percent' | 'credits'>('percent');
+  const [couponMaxUses, setCouponMaxUses] = useState('');
+  const [couponExpires, setCouponExpires] = useState('');
 
   const loadPayments = useCallback(async (page = 1) => {
     setPaymentsLoading(true);
@@ -108,6 +122,90 @@ export function useAdminBilling() {
     }
   }, []);
 
+  // ── Coupon toggle (Edge Function) ──
+  const toggleCoupon = useCallback(async (
+    code: string,
+    fallbackCoupons: Coupon[],
+    setFallbackCoupons: (updater: (prev: Coupon[]) => Coupon[]) => void,
+  ): Promise<{ code: string; active: boolean }> => {
+    const displayNow = couponsData.length > 0 ? couponsData : fallbackCoupons;
+    const coupon = displayNow.find((c) => c.code === code);
+    const newActive = !coupon?.active;
+
+    if (couponsData.length > 0) {
+      setCouponsData((prev) => prev.map((c) => c.code === code ? { ...c, active: newActive } : c));
+    } else {
+      setFallbackCoupons((prev) => prev.map((c) => c.code === code ? { ...c, active: newActive } : c));
+    }
+
+    try {
+      const url = new URL(BILLING_URL);
+      url.searchParams.set('action', 'toggle_coupon');
+      await fetch(url.toString(), {
+        method: 'PATCH',
+        headers: {
+          Authorization: getAuthorizationHeader(),
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ code, is_active: newActive }),
+      });
+    } catch (e) {
+      console.warn('Coupon toggle failed:', e);
+    }
+    return { code, active: newActive };
+  }, [couponsData]);
+
+  // ── Coupon create (Edge Function) ──
+  const createCoupon = useCallback(async (
+    setFallbackCoupons: (updater: (prev: Coupon[]) => Coupon[]) => void,
+  ): Promise<CouponCreateResult> => {
+    if (!couponCode.trim()) return { ok: false, error: '쿠폰 코드를 입력해주세요' };
+    if (!couponDiscount.trim()) return { ok: false, error: '할인값을 입력해주세요' };
+    const discountNum = parseFloat(couponDiscount);
+    if (isNaN(discountNum)) return { ok: false, error: '올바른 숫자를 입력해주세요' };
+
+    const codeUpper = couponCode.toUpperCase();
+    try {
+      const url = new URL(BILLING_URL);
+      url.searchParams.set('action', 'create_coupon');
+      const res = await fetch(url.toString(), {
+        method: 'POST',
+        headers: {
+          Authorization: getAuthorizationHeader(),
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          code: codeUpper,
+          discount_type: couponDiscountType === 'percent' ? 'percent' : 'credits',
+          discount_value: discountNum,
+          max_uses: couponMaxUses ? parseInt(couponMaxUses) : null,
+          expires_at: couponExpires ? new Date(couponExpires).toISOString() : null,
+        }),
+      });
+      const data = await res.json();
+      if (data.error) return { ok: false, error: data.error };
+      await loadCoupons();
+    } catch (e) {
+      console.warn('Coupon create failed:', e);
+      const newCoupon: Coupon = {
+        code: codeUpper,
+        discount: couponDiscountType === 'percent' ? `${couponDiscount}%` : `${couponDiscount} CR`,
+        type: couponDiscountType === 'percent' ? '구독 할인' : '무료 크레딧',
+        used: 0,
+        limit: couponMaxUses ? parseInt(couponMaxUses) : 999,
+        expires: couponExpires || '무제한',
+        active: true,
+      };
+      setFallbackCoupons((prev) => [...prev, newCoupon]);
+    }
+    setCouponCode('');
+    setCouponDiscount('');
+    setCouponMaxUses('');
+    setCouponExpires('');
+    setCouponModal(false);
+    return { ok: true, code: codeUpper };
+  }, [couponCode, couponDiscount, couponDiscountType, couponMaxUses, couponExpires, loadCoupons]);
+
   return {
     paymentsData,
     setPaymentsData,
@@ -121,5 +219,13 @@ export function useAdminBilling() {
     loadPayments,
     loadPaymentStats,
     loadCoupons,
+    couponModal, setCouponModal,
+    couponCode, setCouponCode,
+    couponDiscount, setCouponDiscount,
+    couponDiscountType, setCouponDiscountType,
+    couponMaxUses, setCouponMaxUses,
+    couponExpires, setCouponExpires,
+    toggleCoupon,
+    createCoupon,
   };
 }
