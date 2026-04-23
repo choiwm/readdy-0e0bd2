@@ -1,5 +1,5 @@
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
-import { requireAdmin, AuthFailure } from '../_shared/auth.ts';
+import { requireAdmin, AuthFailure, writeAuditLog, type AuthedAdmin } from '../_shared/auth.ts';
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -21,8 +21,9 @@ function err(msg: string, status = 400) {
 Deno.serve(async (req) => {
   if (req.method === 'OPTIONS') return new Response('ok', { headers: corsHeaders });
 
+  let admin: AuthedAdmin;
   try {
-    await requireAdmin(req);
+    admin = await requireAdmin(req);
   } catch (e) {
     if (e instanceof AuthFailure) return e.response;
     throw e;
@@ -89,7 +90,7 @@ Deno.serve(async (req) => {
     // 환불 처리 - updated_at 컬럼 없으므로 제거
     if (req.method === 'POST' && action === 'refund_payment') {
       const body = await req.json();
-      const { id, refund_reason, admin_email } = body;
+      const { id, refund_reason } = body;
       if (!id) return err('id required');
 
       // payments 테이블에 updated_at 컬럼이 없으므로 제외
@@ -106,14 +107,11 @@ Deno.serve(async (req) => {
 
       if (error) return err(error.message);
 
-      await supabase.from('audit_logs').insert({
-        admin_email: admin_email ?? 'admin',
-        action: '환불 처리',
+      await writeAuditLog(supabase, admin, '환불 처리', {
         target_type: 'payment',
         target_id: id,
         target_label: `결제 ${id.slice(0, 8)}`,
         detail: refund_reason ?? '관리자 환불',
-        result: 'success',
       });
 
       return json({ payment: data });
@@ -198,7 +196,7 @@ Deno.serve(async (req) => {
 
     if (req.method === 'PATCH' && action === 'cancel_subscription') {
       const body = await req.json();
-      const { id, admin_email } = body;
+      const { id } = body;
       if (!id) return err('id required');
 
       const { data, error } = await supabase
@@ -214,13 +212,10 @@ Deno.serve(async (req) => {
 
       if (error) return err(error.message);
 
-      await supabase.from('audit_logs').insert({
-        admin_email: admin_email ?? 'admin',
-        action: '구독 강제 취소',
+      await writeAuditLog(supabase, admin, '구독 강제 취소', {
         target_type: 'subscription',
         target_id: id,
         target_label: `${data.plan} 구독`,
-        result: 'success',
       });
 
       return json({ subscription: data });
@@ -242,7 +237,7 @@ Deno.serve(async (req) => {
 
     if (req.method === 'POST' && action === 'create_coupon') {
       const body = await req.json();
-      const { code, description, discount_type, discount_value, max_uses, applicable_plans, expires_at, admin_email } = body;
+      const { code, description, discount_type, discount_value, max_uses, applicable_plans, expires_at } = body;
 
       if (!code || !discount_type || discount_value === undefined) {
         return err('code, discount_type, discount_value required');
@@ -265,14 +260,11 @@ Deno.serve(async (req) => {
 
       if (error) return err(error.message);
 
-      await supabase.from('audit_logs').insert({
-        admin_email: admin_email ?? 'admin',
-        action: '쿠폰 생성',
+      await writeAuditLog(supabase, admin, '쿠폰 생성', {
         target_type: 'coupon',
         target_id: data.id,
         target_label: code.toUpperCase(),
         detail: `${discount_type === 'percent' ? discount_value + '%' : discount_value + ' CR'} 할인`,
-        result: 'success',
       });
 
       return json({ coupon: data }, 201);
@@ -281,7 +273,7 @@ Deno.serve(async (req) => {
     // 쿠폰 상태 토글 - code 또는 id로 조회 지원
     if (req.method === 'PATCH' && action === 'toggle_coupon') {
       const body = await req.json();
-      const { id, code, is_active, admin_email } = body;
+      const { id, code, is_active } = body;
       if (!id && !code) return err('id or code required');
 
       let targetId = id;
@@ -306,13 +298,10 @@ Deno.serve(async (req) => {
 
       if (error) return err(error.message);
 
-      await supabase.from('audit_logs').insert({
-        admin_email: admin_email ?? 'admin',
-        action: is_active ? '쿠폰 활성화' : '쿠폰 비활성화',
+      await writeAuditLog(supabase, admin, is_active ? '쿠폰 활성화' : '쿠폰 비활성화', {
         target_type: 'coupon',
         target_id: targetId,
         target_label: data.code,
-        result: 'success',
       });
 
       return json({ coupon: data });

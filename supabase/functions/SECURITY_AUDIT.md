@@ -201,10 +201,18 @@ try {
 | `requireUser` 적용 함수 (generate-* 9개 + analyze-video-sfx + check-fal-status + clean-audio + summarize-text + translate-text + credit-alert-* 2개 = 16개) | **16 / 16** |
 | `requireSchedulerSecret` 적용 (cron-manager, healthcheck-scheduler) | **2 / 2** |
 
-### 미해결 위생 항목 (MEDIUM)
+### 해결된 위생 항목
 
-- **`writeAuditLog` 미사용**: `_shared/auth.ts`에 정의된 공통 헬퍼를 어떤 함수도 호출하지 않음. 각 admin-* 함수가 `audit_logs` 테이블에 직접 insert 중 (총 inserts: admin-cs 6, admin-users 6, admin-billing 4, admin-security 4, admin-audit 3, admin-stats 1, admin-teams 1, admin-api-keys 1; admin-content는 read-only). → 후속 리팩토링 대상.
-- **읽기 전용 admin-content / admin-stats**: 파괴적 호출 없음. 현 상태 OK.
+- **`writeAuditLog` 마이그레이션 완료** (2026-04-23): `_shared/auth.ts`의 `writeAuditLog(supabase, admin, action, options)` 공통 헬퍼로 21개 call site 통합.
+  - 마이그레이션 대상: admin-users(6), admin-cs(6), admin-billing(4), admin-security(4), admin-teams(1)
+  - `admin_email`을 request body가 아닌 **JWT에서 추출된 값**으로 작성 → spoofing 방지
+  - 헬퍼 내부 `try/catch`로 audit 실패가 주 작업을 막지 않도록 보장
+  - 남은 직접 insert: `admin-api-keys`의 `safeAuditLog` 내부 헬퍼 (시스템 이벤트 혼재) — 별도 방식으로 관리 중
+
+### 읽기 전용 함수 (이슈 없음)
+
+- `admin-content`, `admin-stats`: 파괴적 호출 없음. 현 상태 OK.
+- `admin-audit`의 `create_log` action은 범용 로그 ingestion 엔드포인트로 의도적으로 body-based 유지.
 
 자동 검증 명령:
 

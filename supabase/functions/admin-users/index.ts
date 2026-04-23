@@ -1,5 +1,5 @@
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
-import { requireAdmin, AuthFailure } from '../_shared/auth.ts';
+import { requireAdmin, AuthFailure, writeAuditLog, type AuthedAdmin } from '../_shared/auth.ts';
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -21,8 +21,9 @@ function err(msg: string, status = 400) {
 Deno.serve(async (req) => {
   if (req.method === 'OPTIONS') return new Response('ok', { headers: corsHeaders });
 
+  let admin: AuthedAdmin;
   try {
-    await requireAdmin(req);
+    admin = await requireAdmin(req);
   } catch (e) {
     if (e instanceof AuthFailure) return e.response;
     throw e;
@@ -150,7 +151,7 @@ Deno.serve(async (req) => {
     // ─────────────────────────────────────────────
     if (req.method === 'PATCH' && action === 'update_user_status') {
       const body = await req.json();
-      const { id, status, reason, admin_email } = body;
+      const { id, status, reason } = body;
       if (!id || !status) return err('id and status required');
 
       const { data, error } = await supabase
@@ -162,14 +163,11 @@ Deno.serve(async (req) => {
 
       if (error) return err(error.message);
 
-      await supabase.from('audit_logs').insert({
-        admin_email: admin_email ?? 'admin',
-        action: status === 'suspended' ? '계정 정지' : '계정 활성화',
+      await writeAuditLog(supabase, admin, status === 'suspended' ? '계정 정지' : '계정 활성화', {
         target_type: 'user',
         target_id: id,
         target_label: data.email,
         detail: reason ?? '',
-        result: 'success',
       });
 
       return json({ user: data });
@@ -180,7 +178,7 @@ Deno.serve(async (req) => {
     // ─────────────────────────────────────────────
     if (req.method === 'PATCH' && action === 'update_member_grade') {
       const body = await req.json();
-      const { id, member_grade, reason, admin_email } = body;
+      const { id, member_grade, reason } = body;
       if (!id || !member_grade) return err('id and member_grade required');
 
       const validGrades = ['general', 'staff', 'b2b', 'group', 'vip', 'suspended'];
@@ -195,14 +193,11 @@ Deno.serve(async (req) => {
 
       if (error) return err(error.message);
 
-      await supabase.from('audit_logs').insert({
-        admin_email: admin_email ?? 'admin',
-        action: '회원 등급 변경',
+      await writeAuditLog(supabase, admin, '회원 등급 변경', {
         target_type: 'user',
         target_id: id,
         target_label: data.email,
         detail: `등급 → ${member_grade} (사유: ${reason ?? '-'})`,
-        result: 'success',
       });
 
       return json({ user: data });
@@ -226,7 +221,7 @@ Deno.serve(async (req) => {
     // ─────────────────────────────────────────────
     if (req.method === 'PUT' && action === 'update_grade_permissions') {
       const body = await req.json();
-      const { grade, permissions, admin_email } = body;
+      const { grade, permissions } = body;
       if (!grade || !permissions) return err('grade and permissions required');
 
       const allowedKeys = [
@@ -255,14 +250,11 @@ Deno.serve(async (req) => {
       if (error) return err(error.message);
 
       const changedLabel = permissions.grade_label ? ` (라벨: ${permissions.grade_label})` : '';
-      await supabase.from('audit_logs').insert({
-        admin_email: admin_email ?? 'admin',
-        action: '등급 권한 수정',
+      await writeAuditLog(supabase, admin, '등급 권한 수정', {
         target_type: 'system',
         target_id: grade,
         target_label: `${grade} 등급 권한${changedLabel}`,
         detail: `권한 설정 업데이트`,
-        result: 'success',
       });
 
       return json({ grade_permission: data });
@@ -294,7 +286,7 @@ Deno.serve(async (req) => {
     // ─────────────────────────────────────────────
     if (req.method === 'POST' && action === 'adjust_credits') {
       const body = await req.json();
-      const { id, amount, reason, admin_email } = body;
+      const { id, amount, reason } = body;
       if (!id || amount === undefined) return err('id and amount required');
 
       const { data: profile, error: profileErr } = await supabase
@@ -316,14 +308,11 @@ Deno.serve(async (req) => {
 
       if (error) return err(error.message);
 
-      await supabase.from('audit_logs').insert({
-        admin_email: admin_email ?? 'admin',
-        action: amount > 0 ? '크레딧 수동 지급' : '크레딧 수동 차감',
+      await writeAuditLog(supabase, admin, amount > 0 ? '크레딧 수동 지급' : '크레딧 수동 차감', {
         target_type: 'user',
         target_id: id,
         target_label: profile.email,
         detail: `${amount > 0 ? '+' : ''}${amount} 크레딧 (사유: ${reason ?? '-'})`,
-        result: 'success',
       });
 
       return json({ user: data, new_balance: newBalance });
@@ -334,7 +323,7 @@ Deno.serve(async (req) => {
     // ─────────────────────────────────────────────
     if (req.method === 'POST' && action === 'grant_credits') {
       const body = await req.json();
-      const { amount, reason, admin_email, target_type, target_value } = body;
+      const { amount, reason, target_type, target_value } = body;
       // target_type: 'all' | 'plan' | 'grade' | 'user_ids'
       // target_value: plan name | grade name | string[] of user ids
       if (!amount || amount <= 0) return err('amount must be positive');
@@ -376,14 +365,11 @@ Deno.serve(async (req) => {
         : target_type === 'grade' ? `${target_value} 등급 유저`
         : `선택 유저 ${Array.isArray(target_value) ? target_value.length : 0}명`;
 
-      await supabase.from('audit_logs').insert({
-        admin_email: admin_email ?? 'admin',
-        action: '크레딧 일괄 지급',
+      await writeAuditLog(supabase, admin, '크레딧 일괄 지급', {
         target_type: 'user',
         target_id: 'batch',
         target_label: targetLabel,
         detail: `+${amount} 크레딧 × ${users.length}명 (사유: ${reason ?? '-'})`,
-        result: 'success',
       });
 
       return json({
@@ -400,7 +386,7 @@ Deno.serve(async (req) => {
     // ─────────────────────────────────────────────
     if (req.method === 'PATCH' && action === 'update_user_plan') {
       const body = await req.json();
-      const { id, plan, admin_email } = body;
+      const { id, plan } = body;
       if (!id || !plan) return err('id and plan required');
 
       const planLower = plan.toLowerCase();
@@ -414,14 +400,11 @@ Deno.serve(async (req) => {
 
       if (error) return err(error.message);
 
-      await supabase.from('audit_logs').insert({
-        admin_email: admin_email ?? 'admin',
-        action: '플랜 수동 변경',
+      await writeAuditLog(supabase, admin, '플랜 수동 변경', {
         target_type: 'user',
         target_id: id,
         target_label: data.email,
         detail: `플랜 → ${planLower}`,
-        result: 'success',
       });
 
       return json({ user: data });

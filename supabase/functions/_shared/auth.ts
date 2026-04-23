@@ -128,22 +128,37 @@ export async function withAuth(handler: () => Promise<Response>): Promise<Respon
   }
 }
 
+export interface AuditLogOptions {
+  target_type?: string;
+  target_id?: string | null;
+  target_label?: string | null;
+  detail?: string | null;
+  ip_address?: string | null;
+  result?: 'success' | 'failure';
+}
+
 /**
  * Insert an audit-log row for a destructive or sensitive admin action.
+ *
+ * Admin identity (email) is pulled from the verified JWT via AuthedAdmin, not
+ * from request body — requests cannot spoof who performed the action.
  */
 export async function writeAuditLog(
   supabase: SupabaseClient<any, any, any>,
   admin: AuthedAdmin,
   action: string,
-  details: Record<string, unknown> = {},
+  options: AuditLogOptions = {},
 ): Promise<void> {
   try {
     await supabase.from('audit_logs').insert({
-      admin_id: admin.adminId,
       admin_email: admin.email,
       action,
-      details,
-      created_at: new Date().toISOString(),
+      target_type: options.target_type ?? null,
+      target_id: options.target_id ?? null,
+      target_label: options.target_label ?? null,
+      detail: options.detail ?? null,
+      ip_address: options.ip_address ?? null,
+      result: options.result ?? 'success',
     });
   } catch {
     // audit 실패로 원 작업을 막지 않는다 — 배치 모니터링에서 탐지

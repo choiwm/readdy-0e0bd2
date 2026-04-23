@@ -1,5 +1,5 @@
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
-import { requireAdmin, AuthFailure } from '../_shared/auth.ts';
+import { requireAdmin, AuthFailure, writeAuditLog, type AuthedAdmin } from '../_shared/auth.ts';
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -21,8 +21,9 @@ function err(msg: string, status = 400) {
 Deno.serve(async (req) => {
   if (req.method === 'OPTIONS') return new Response('ok', { headers: corsHeaders });
 
+  let admin: AuthedAdmin;
   try {
-    await requireAdmin(req);
+    admin = await requireAdmin(req);
   } catch (e) {
     if (e instanceof AuthFailure) return e.response;
     throw e;
@@ -133,7 +134,7 @@ Deno.serve(async (req) => {
     // POST /ticket/reply - 티켓 답변 등록 + 상태 변경
     if (req.method === 'POST' && action === 'reply_ticket') {
       const body = await req.json();
-      const { id, reply_content, replied_by, new_status } = body;
+      const { id, reply_content, new_status } = body;
       if (!id || !reply_content) return err('id and reply_content required');
 
       const { data, error } = await supabase
@@ -141,7 +142,7 @@ Deno.serve(async (req) => {
         .update({
           reply_content,
           replied_at:  new Date().toISOString(),
-          replied_by:  replied_by ?? null,
+          replied_by:  admin.email,
           status:      new_status ?? 'resolved',
           resolved_at: new_status === 'resolved' || !new_status ? new Date().toISOString() : null,
           updated_at:  new Date().toISOString(),
@@ -152,15 +153,11 @@ Deno.serve(async (req) => {
 
       if (error) return err(error.message);
 
-      // 감사 로그 기록
-      await supabase.from('audit_logs').insert({
-        admin_email:  replied_by ?? 'admin',
-        action:       '티켓 답변 등록',
+      await writeAuditLog(supabase, admin, '티켓 답변 등록', {
         target_type:  'ticket',
         target_id:    id,
         target_label: data.title,
         detail:       `상태: ${new_status ?? 'resolved'}`,
-        result:       'success',
       });
 
       return json({ ticket: data });
@@ -250,7 +247,7 @@ Deno.serve(async (req) => {
     // POST /notice - 공지사항 생성
     if (req.method === 'POST' && action === 'create_notice') {
       const body = await req.json();
-      const { title, content, category, status, is_pinned, target_plans, expires_at, created_by } = body;
+      const { title, content, category, status, is_pinned, target_plans, expires_at } = body;
 
       if (!title || !content) return err('title and content required');
 
@@ -261,7 +258,7 @@ Deno.serve(async (req) => {
         status:       status       ?? 'draft',
         is_pinned:    is_pinned    ?? false,
         target_plans: target_plans ?? ['free', 'starter', 'pro', 'enterprise'],
-        created_by:   created_by   ?? null,
+        created_by:   admin.email,
       };
 
       if (status === 'published') insertData.published_at = new Date().toISOString();
@@ -275,14 +272,10 @@ Deno.serve(async (req) => {
 
       if (error) return err(error.message);
 
-      // 감사 로그
-      await supabase.from('audit_logs').insert({
-        admin_email:  created_by ?? 'admin',
-        action:       status === 'published' ? '공지사항 게시' : '공지사항 초안 저장',
+      await writeAuditLog(supabase, admin, status === 'published' ? '공지사항 게시' : '공지사항 초안 저장', {
         target_type:  'notice',
         target_id:    data.id,
         target_label: title,
-        result:       'success',
       });
 
       return json({ notice: data }, 201);
@@ -316,13 +309,10 @@ Deno.serve(async (req) => {
 
       if (error) return err(error.message);
 
-      // 감사 로그
-      await supabase.from('audit_logs').insert({
-        action:       '공지사항 수정',
+      await writeAuditLog(supabase, admin, '공지사항 수정', {
         target_type:  'notice',
         target_id:    id,
         target_label: data.title,
-        result:       'success',
       });
 
       return json({ notice: data });
@@ -356,12 +346,9 @@ Deno.serve(async (req) => {
       const { error } = await supabase.from('notices').delete().eq('id', id);
       if (error) return err(error.message);
 
-      // 감사 로그
-      await supabase.from('audit_logs').insert({
-        action:      '공지사항 삭제',
+      await writeAuditLog(supabase, admin, '공지사항 삭제', {
         target_type: 'notice',
         target_id:   id,
-        result:      'success',
       });
 
       return json({ success: true });
@@ -374,17 +361,13 @@ Deno.serve(async (req) => {
     // POST /send_push - 푸시 알림 발송
     if (req.method === 'POST' && action === 'send_push') {
       const body = await req.json();
-      const { title, message, target_plan, sent_by } = body;
+      const { title, message, target_plan } = body;
       if (!message) return err('message required');
 
-      // 감사 로그 기록
-      await supabase.from('audit_logs').insert({
-        admin_email:  sent_by ?? 'admin',
-        action:       '브라우저 푸시 발송',
+      await writeAuditLog(supabase, admin, '브라우저 푸시 발송', {
         target_type:  'system',
         target_label: `대상: ${target_plan ?? '전체'}`,
         detail:       message.slice(0, 100),
-        result:       'success',
       });
 
       return json({
@@ -397,17 +380,13 @@ Deno.serve(async (req) => {
     // POST /send_email - 이메일 발송
     if (req.method === 'POST' && action === 'send_email') {
       const body = await req.json();
-      const { subject, message, target_plan, sent_by } = body;
+      const { subject, message, target_plan } = body;
       if (!subject || !message) return err('subject and message required');
 
-      // 감사 로그 기록
-      await supabase.from('audit_logs').insert({
-        admin_email:  sent_by ?? 'admin',
-        action:       '이메일 발송',
+      await writeAuditLog(supabase, admin, '이메일 발송', {
         target_type:  'system',
         target_label: `대상: ${target_plan ?? '전체'}`,
         detail:       `제목: ${subject}`,
-        result:       'success',
       });
 
       return json({
