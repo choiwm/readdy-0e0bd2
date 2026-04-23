@@ -31,6 +31,9 @@ import { useAdminBilling, PAYMENTS_PAGE_SIZE } from './hooks/useAdminBilling';
 import { useAdminCs } from './hooks/useAdminCs';
 import { useAdminAudit } from './hooks/useAdminAudit';
 import { useAdminUsers } from './hooks/useAdminUsers';
+import { useAdminOverview } from './hooks/useAdminOverview';
+import { useAdminContent } from './hooks/useAdminContent';
+import { useAdminAiEngine } from './hooks/useAdminAiEngine';
 import { getAuthorizationHeader } from '@/lib/env';
 
 // ── Types ──────────────────────────────────────────────────────────────────
@@ -227,43 +230,32 @@ export default function AdminPage() {
     adminAccountsData, setAdminAccountsData,
     loadAuditLogs, loadAuditStats, loadIpBlocks, loadAdminAccounts,
   } = useAdminAudit();
-  const [overviewStats, setOverviewStats] = useState<{
-    users?: { total: number; active: number; new_today: number; new_month: number; plan_dist: { free: number; pro: number; enterprise: number } };
-    revenue?: { monthly: number; last_month: number; total: number; growth_pct: number };
-    content?: { total: number; gallery: number; audio: number; automation: number; board: number };
-    cs?: { open: number; in_progress: number; total: number };
-  } | null>(null);
+  const {
+    overviewStats,
+    overviewLoading,
+    dailySignupsData,
+    planDistData,
+    contentTrendsData,
+    monthlyRevenueData,
+    recentAuditLogs,
+    apiHealthData,
+    apiHealthLoading,
+    planUserCounts,
+    loadOverviewStats,
+    loadPlanUserCounts,
+    loadApiHealth,
+  } = useAdminOverview();
 
-  // ── Overview 추가 실시간 데이터 ──
-  const [dailySignupsData, setDailySignupsData] = useState<number[]>([]);
-  const [planDistData, setPlanDistData] = useState<{ label: string; count: number; pct: number; color: string }[]>([]);
-  const [contentTrendsData, setContentTrendsData] = useState<{ name: string; count: number; pct: number; color: string; icon: string }[]>([]);
-  const [monthlyRevenueData, setMonthlyRevenueData] = useState<{ label: string; value: number }[]>([]);
-  const [recentAuditLogs, setRecentAuditLogs] = useState<{ admin: string; action: string; target: string; detail: string; time: string }[]>([]);
-  const [overviewLoading, setOverviewLoading] = useState(false);
-
-  // ── AI Engine 탭 실제 API 통계 ──
-  const [apiHealthData, setApiHealthData] = useState<{
-    image?: { requests_24h: number; requests_today: number; requests_1h: number; error_rate: number; status: string };
-    audio?: { requests_24h: number; requests_today: number; requests_1h: number; error_rate: number; status: string };
-    video?: { requests_24h: number; requests_today: number; requests_1h: number; error_rate: number; status: string };
-    total_requests_today?: number;
-    total_requests_1h?: number;
-  } | null>(null);
-  const [apiHealthLoading, setApiHealthLoading] = useState(false);
-
-  // ── Content 탭 실제 데이터 ──
-  const [contentDbItems, setContentDbItems] = useState<{
-    id: string; title: string; user: string; type: string; source: string;
-    status: string; date: string; thumbnail: string; model: string;
-  }[]>([]);
-  const [contentDbStats, setContentDbStats] = useState<{
-    total: number; gallery: number; audio: number; automation: number; board: number; pending: number; blocked: number;
-  } | null>(null);
-  const [contentDbLoading, setContentDbLoading] = useState(false);
-
-  // ── Billing 구독 플랜 현황 ──
-  const [planUserCounts, setPlanUserCounts] = useState<{ free: number; pro: number; enterprise: number } | null>(null);
+  // ── Content / Teams ──
+  const {
+    contentDbItems, setContentDbItems,
+    contentDbStats,
+    contentDbLoading,
+    teamsData,
+    teamsLoading,
+    teamStats,
+    loadContentItems, loadContentStats, loadTeams,
+  } = useAdminContent();
 
   // paymentsPage/Total/TotalPages + PAYMENTS_PAGE_SIZE now come from useAdminBilling
   const paymentsPage = paymentsPageFromHook;
@@ -286,15 +278,15 @@ export default function AdminPage() {
   // csTicketStats now comes from useAdminCs
 
   // ── AI Engine State ──
-  const [promptTemplates, setPromptTemplates] = useState<PromptTemplate[]>([
-    { id: 'PT-01', name: '유튜브 광고용 스크립트', category: '영상', model: 'GPT-4o', lastUpdated: '2026.04.10', usageCount: 8420, active: true },
-    { id: 'PT-02', name: '음악 제작 마스터 프롬프트', category: '음악', model: 'Suno', lastUpdated: '2026.04.08', usageCount: 3210, active: true },
-    { id: 'PT-03', name: '이미지 생성 기본 템플릿', category: '이미지', model: 'Stable Diffusion', lastUpdated: '2026.04.12', usageCount: 21840, active: true },
-    { id: 'PT-04', name: '쇼츠 자동화 나레이션', category: '음성', model: 'ElevenLabs', lastUpdated: '2026.04.05', usageCount: 5670, active: true },
-    { id: 'PT-05', name: '광고 카피라이팅 템플릿', category: '텍스트', model: 'GPT-4o', lastUpdated: '2026.04.01', usageCount: 2890, active: false },
-  ]);
-  const [editingTemplate, setEditingTemplate] = useState<PromptTemplate | null | 'new'>('new' as const);
-  const [promptEditOpen, setPromptEditOpen] = useState(false);
+  const {
+    promptTemplates,
+    editingTemplate,
+    promptEditOpen,
+    toggleTemplateActive,
+    upsertTemplate,
+    openEditor: openPromptEditor,
+    closeEditor: closePromptEditor,
+  } = useAdminAiEngine();
 
 
   // ── Security State ──
@@ -316,10 +308,7 @@ export default function AdminPage() {
   // ── Content State ──
   const [contentItems, setContentItems] = useState<{ id: string; title: string; user: string; type: string; status: 'approved' | 'pending' | 'blocked'; date: string; rating: number; thumbnail: string }[]>([]);
 
-  // ── Team State ──
-  const [teamsData, setTeamsData] = useState<TeamRecord[]>([]);
-  const [teamsLoading, setTeamsLoading] = useState(false);
-  const [teamStats, setTeamStats] = useState({ total: 0, active: 0, inactive: 0, total_members: 0 });
+  // ── Team Modal/Sub-tab ──
   const [teamModal, setTeamModal] = useState<TeamRecord | null | 'new'>(null);
   const [contentSubTab, setContentSubTab] = useState<'items' | 'teams'>('items');
 
@@ -327,183 +316,6 @@ export default function AdminPage() {
   const [payments, setPayments] = useState<{ id: string; user: string; plan: string; amount: string; date: string; status: string; method: string }[]>([]);
 
   // ── Handlers ──────────────────────────────────────────────────────────────
-
-  // ── Overview 통계 로드 (전체 병렬 로드) ──
-  const loadOverviewStats = useCallback(async () => {
-    setOverviewLoading(true);
-    try {
-      const base = `${import.meta.env.VITE_PUBLIC_SUPABASE_URL}/functions/v1/admin-stats`;
-      const headers = { 'Authorization': getAuthorizationHeader() };
-
-      const [overviewRes, dailyRes, planRes, trendsRes, monthlyRes, auditRes] = await Promise.allSettled([
-        fetch(`${base}?action=overview`, { headers }),
-        fetch(`${base}?action=daily_signups&days=14`, { headers }),
-        fetch(`${base}?action=plan_dist`, { headers }),
-        fetch(`${base}?action=content_trends`, { headers }),
-        fetch(`${base}?action=monthly_revenue&months=6`, { headers }),
-        fetch(`${base}?action=recent_audit&limit=6`, { headers }),
-      ]);
-
-      // overview
-      if (overviewRes.status === 'fulfilled') {
-        const data = await overviewRes.value.json();
-        if (!data.error) setOverviewStats(data);
-      }
-
-      // daily signups
-      if (dailyRes.status === 'fulfilled') {
-        const data = await dailyRes.value.json();
-        if (data.daily_signups) {
-          const vals = Object.values(data.daily_signups) as number[];
-          setDailySignupsData(vals);
-        }
-      }
-
-      // plan dist
-      if (planRes.status === 'fulfilled') {
-        const data = await planRes.value.json();
-        if (data.plan_dist) setPlanDistData(data.plan_dist);
-      }
-
-      // content trends
-      if (trendsRes.status === 'fulfilled') {
-        const data = await trendsRes.value.json();
-        if (data.content_trends) setContentTrendsData(data.content_trends);
-      }
-
-      // monthly revenue
-      if (monthlyRes.status === 'fulfilled') {
-        const data = await monthlyRes.value.json();
-        if (data.monthly_revenue) {
-          const entries = Object.entries(data.monthly_revenue as Record<string, number>);
-          const mapped = entries.map(([key, val]) => {
-            const [, month] = key.split('-');
-            return { label: `${parseInt(month)}월`, value: val };
-          });
-          setMonthlyRevenueData(mapped);
-        }
-      }
-
-      // recent audit logs
-      if (auditRes.status === 'fulfilled') {
-        const data = await auditRes.value.json();
-        if (data.logs && data.logs.length > 0) setRecentAuditLogs(data.logs);
-      }
-    } catch (e) {
-      console.warn('Overview stats load failed:', e);
-    } finally {
-      setOverviewLoading(false);
-    }
-  }, []);
-
-  // ── Teams 로드 ──
-  const loadTeams = useCallback(async () => {
-    setTeamsLoading(true);
-    try {
-      const base = `${import.meta.env.VITE_PUBLIC_SUPABASE_URL}/functions/v1/admin-teams`;
-      const headers = { 'Authorization': getAuthorizationHeader() };
-      const [teamsRes, statsRes] = await Promise.allSettled([
-        fetch(`${base}?action=list_teams`, { headers }),
-        fetch(`${base}?action=team_stats`, { headers }),
-      ]);
-      if (teamsRes.status === 'fulfilled') {
-        const data = await teamsRes.value.json();
-        if (data.teams) setTeamsData(data.teams);
-      }
-      if (statsRes.status === 'fulfilled') {
-        const data = await statsRes.value.json();
-        if (data.stats) setTeamStats(data.stats);
-      }
-    } catch (e) {
-      console.warn('Teams load failed:', e);
-    } finally {
-      setTeamsLoading(false);
-    }
-  }, []);
-
-  // ── Content 탭 데이터 로드 ──
-  const loadContentItems = useCallback(async (statusFilter?: string) => {
-    setContentDbLoading(true);
-    try {
-      const fetchUrl = new URL(`${import.meta.env.VITE_PUBLIC_SUPABASE_URL}/functions/v1/admin-content`);
-      fetchUrl.searchParams.set('action', 'list');
-      fetchUrl.searchParams.set('limit', '30');
-      if (statusFilter && statusFilter !== '전체') {
-        const statusMap: Record<string, string> = { '승인': 'approved', '검토중': 'pending', '차단': 'blocked' };
-        const mapped = statusMap[statusFilter];
-        if (mapped) fetchUrl.searchParams.set('status', mapped);
-      }
-      const res = await fetch(fetchUrl.toString(), {
-        headers: { 'Authorization': getAuthorizationHeader() },
-      });
-      const data = await res.json();
-      if (data.items) setContentDbItems(data.items);
-    } catch (e) {
-      console.warn('Content items load failed:', e);
-    } finally {
-      setContentDbLoading(false);
-    }
-  }, []);
-
-  const loadContentStats = useCallback(async () => {
-    try {
-      const fetchUrl = new URL(`${import.meta.env.VITE_PUBLIC_SUPABASE_URL}/functions/v1/admin-content`);
-      fetchUrl.searchParams.set('action', 'stats');
-      const res = await fetch(fetchUrl.toString(), {
-        headers: { 'Authorization': getAuthorizationHeader() },
-      });
-      const data = await res.json();
-      if (data.stats) setContentDbStats(data.stats);
-    } catch (e) {
-      console.warn('Content stats load failed:', e);
-    }
-  }, []);
-
-  // ── Billing 구독 플랜 현황 로드 ──
-  const loadPlanUserCounts = useCallback(async () => {
-    try {
-      // overviewStats에서 plan_dist 활용 (이미 로드됨)
-      if (overviewStats?.users?.plan_dist) {
-        setPlanUserCounts(overviewStats.users.plan_dist);
-        return;
-      }
-      // 없으면 admin-stats plan_dist 액션 호출
-      const fetchUrl = new URL(`${import.meta.env.VITE_PUBLIC_SUPABASE_URL}/functions/v1/admin-stats`);
-      fetchUrl.searchParams.set('action', 'plan_dist');
-      const res = await fetch(fetchUrl.toString(), {
-        headers: { 'Authorization': getAuthorizationHeader() },
-      });
-      const data = await res.json();
-      if (data.plan_dist) {
-        const dist = data.plan_dist as { label: string; count: number }[];
-        setPlanUserCounts({
-          free:       dist.find((d) => d.label === 'Free')?.count ?? 0,
-          pro:        dist.find((d) => d.label === 'Pro')?.count ?? 0,
-          enterprise: dist.find((d) => d.label === 'Enterprise')?.count ?? 0,
-        });
-      }
-    } catch (e) {
-      console.warn('Plan user counts load failed:', e);
-    }
-  }, [overviewStats]);
-
-  // ── AI Engine 탭 API 통계 로드 ──
-  const loadApiHealth = useCallback(async () => {
-    setApiHealthLoading(true);
-    try {
-      const fetchUrl = new URL(`${import.meta.env.VITE_PUBLIC_SUPABASE_URL}/functions/v1/admin-stats`);
-      fetchUrl.searchParams.set('action', 'api_health');
-      const res = await fetch(fetchUrl.toString(), {
-        headers: { 'Authorization': getAuthorizationHeader() },
-      });
-      const data = await res.json();
-      if (data.api_stats) setApiHealthData(data.api_stats);
-    } catch (e) {
-      console.warn('API health load failed:', e);
-    } finally {
-      setApiHealthLoading(false);
-    }
-  }, []);
 
   // ── Overview 자동 새로고침 (30초 인터벌) ──
   const overviewIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
@@ -877,18 +689,13 @@ export default function AdminPage() {
 
   // AI Engine: prompt template toggle
   const handlePromptToggle = (id: string) => {
-    setPromptTemplates((prev) => prev.map((pt) => pt.id === id ? { ...pt, active: !pt.active } : pt));
-    const pt = promptTemplates.find((p) => p.id === id);
+    const pt = toggleTemplateActive(id);
     addToast(`템플릿 "${pt?.name}" ${pt?.active ? '비활성화' : '활성화'}됐습니다`, 'info');
   };
 
   // AI Engine: prompt template save
   const handlePromptSave = (template: PromptTemplate) => {
-    setPromptTemplates((prev) => {
-      const exists = prev.find((p) => p.id === template.id);
-      if (exists) return prev.map((p) => p.id === template.id ? template : p);
-      return [...prev, template];
-    });
+    upsertTemplate(template);
     addToast(`템플릿 "${template.name}"이 저장됐습니다`, 'success');
   };
 
@@ -1572,10 +1379,7 @@ export default function AdminPage() {
                 apiStatus={apiStatus}
                 promptTemplates={promptTemplates}
                 onPromptToggle={handlePromptToggle}
-                onPromptEdit={(template) => {
-                  setEditingTemplate(template ?? 'new');
-                  setPromptEditOpen(true);
-                }}
+                onPromptEdit={(template) => openPromptEditor(template ?? null)}
                 apiHealthData={apiHealthData}
                 apiHealthLoading={apiHealthLoading}
               />
@@ -1962,8 +1766,8 @@ export default function AdminPage() {
       {promptEditOpen && (
         <PromptEditModal
           template={editingTemplate === 'new' ? null : editingTemplate}
-          onClose={() => { setPromptEditOpen(false); setEditingTemplate('new'); }}
-          onSave={(template) => { handlePromptSave(template); setPromptEditOpen(false); }}
+          onClose={closePromptEditor}
+          onSave={(template) => { handlePromptSave(template); closePromptEditor(); }}
           isDark={isDark}
         />
       )}
