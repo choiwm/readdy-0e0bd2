@@ -2,7 +2,7 @@ import { useState } from 'react';
 import { useSortable } from '@dnd-kit/sortable';
 import { CSS } from '@dnd-kit/utilities';
 import type { ShotCard } from '../types';
-import { SHOT_TYPES, CREDITS_PER_CUT } from '../types';
+import { SHOT_TYPES } from '../types';
 
 interface ShotCardItemProps {
   shot: ShotCard; isPortrait: boolean; isSquare: boolean;

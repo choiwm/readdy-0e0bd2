@@ -207,7 +207,7 @@ try {
   - 마이그레이션 대상: admin-users(6), admin-cs(6), admin-billing(4), admin-security(4), admin-teams(1)
   - `admin_email`을 request body가 아닌 **JWT에서 추출된 값**으로 작성 → spoofing 방지
   - 헬퍼 내부 `try/catch`로 audit 실패가 주 작업을 막지 않도록 보장
-  - 남은 직접 insert: `admin-api-keys`의 `safeAuditLog` 내부 헬퍼 (시스템 이벤트 혼재) — 별도 방식으로 관리 중
+  - **`admin-api-keys` 마이그레이션 완료**: 관리자-트리거 6개 call site는 `writeAuditLog(supabase, admin, ...)`로 이관, JWT 기반 `admin.email` 사용. 시스템-트리거 1개 (월 한도 초과 자동 비활성화)는 파일 내 `writeSystemAuditLog` 헬퍼로 분리 — `admin_email: 'system'` sentinel로 귀속 불가능함을 명시.
 
 ### 읽기 전용 함수 (이슈 없음)
 

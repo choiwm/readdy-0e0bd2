@@ -1,5 +1,5 @@
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
-import { requireAdmin, AuthFailure } from '../_shared/auth.ts';
+import { requireAdmin, AuthFailure, writeAuditLog, type AuthedAdmin } from '../_shared/auth.ts';
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -114,8 +114,23 @@ function maskKey(key: string): string {
   return key.slice(0, 4) + '••••••••' + key.slice(-4);
 }
 
-async function safeAuditLog(supabase: ReturnType<typeof createClient>, payload: Record<string, unknown>) {
-  try { await supabase.from('audit_logs').insert(payload); } catch (e) { console.warn('audit log failed:', e); }
+// 시스템 자동 이벤트(월 한도 초과 자동 비활성화 등) 전용 — admin 귀속이 불가능한 side-effect.
+// 관리자가 직접 트리거한 액션은 _shared/auth.ts의 writeAuditLog 사용.
+async function writeSystemAuditLog(
+  supabase: ReturnType<typeof createClient>,
+  action: string,
+  payload: Record<string, unknown>,
+) {
+  try {
+    await supabase.from('audit_logs').insert({
+      admin_email: 'system',
+      action,
+      result: 'success',
+      ...payload,
+    });
+  } catch (e) {
+    console.warn('system audit log failed:', e);
+  }
 }
 
 interface TestHistoryEntry {
@@ -175,7 +190,7 @@ async function checkAndHandleMonthlyLimit(
     const action = monthly_limit_action ?? 'notify';
     if ((action === 'disable' || action === 'both') && status !== 'inactive') {
       await supabase.from('api_keys').update({ status: 'inactive', updated_at: now }).eq('service_slug', slug);
-      await safeAuditLog(supabase, { admin_email: 'system', action: 'API 키 자동 비활성화', target_type: 'system', target_id: slug, target_label: keyData.service_name, result: 'success', detail: `월 사용량 한도 초과 (${monthly_used}/${monthly_limit}) — 자동 비활성화` });
+      await writeSystemAuditLog(supabase, 'API 키 자동 비활성화', { target_type: 'system', target_id: slug, target_label: keyData.service_name, detail: `월 사용량 한도 초과 (${monthly_used}/${monthly_limit}) — 자동 비활성화` });
     }
     if (action === 'notify' || action === 'both') {
       const lastNotified = limit_notified_at ? new Date(limit_notified_at).getTime() : 0;
@@ -348,8 +363,9 @@ const SLUG_TO_NAME: Record<string, string> = {
 Deno.serve(async (req) => {
   if (req.method === 'OPTIONS') return new Response('ok', { headers: corsHeaders });
 
+  let admin: AuthedAdmin;
   try {
-    await requireAdmin(req);
+    admin = await requireAdmin(req);
   } catch (e) {
     if (e instanceof AuthFailure) return e.response;
     throw e;
@@ -470,7 +486,7 @@ Deno.serve(async (req) => {
         resultData = data; resultError = error;
       }
       if (resultError) return err(resultError.message);
-      await safeAuditLog(supabase, { admin_email: 'admin', action: 'API 키 저장', target_type: 'system', target_id: service_slug, target_label: serviceName, result: 'success', detail: `키 힌트: ${hint} | 암호화: AES-GCM v2 (SHA-256)` });
+      await writeAuditLog(supabase, admin, 'API 키 저장', { target_type: 'system', target_id: service_slug, target_label: serviceName, detail: `키 힌트: ${hint} | 암호화: AES-GCM v2 (SHA-256)` });
       return json({ success: true, api_key: resultData });
     }
 
@@ -544,7 +560,7 @@ Deno.serve(async (req) => {
       if (limit_notify_threshold !== undefined) updateData.limit_notify_threshold = Math.min(100, Math.max(1, limit_notify_threshold));
       const { error } = await supabase.from('api_keys').update(updateData).eq('service_slug', service_slug);
       if (error) return err(error.message);
-      await safeAuditLog(supabase, { admin_email: 'admin', action: 'API 키 한도 설정 변경', target_type: 'system', target_id: service_slug, target_label: service_slug, result: 'success', detail: JSON.stringify(updateData) });
+      await writeAuditLog(supabase, admin, 'API 키 한도 설정 변경', { target_type: 'system', target_id: service_slug, target_label: service_slug, detail: JSON.stringify(updateData) });
       return json({ success: true });
     }
 
@@ -555,14 +571,14 @@ Deno.serve(async (req) => {
       if (!service_slug) return err('service_slug required');
       const { error } = await supabase.from('api_keys').update({ monthly_used: 0, limit_notified_at: null, status: 'active', updated_at: new Date().toISOString() }).eq('service_slug', service_slug);
       if (error) return err(error.message);
-      await safeAuditLog(supabase, { admin_email: 'admin', action: 'API 키 월 사용량 리셋', target_type: 'system', target_id: service_slug, target_label: service_slug, result: 'success', detail: '월 사용량 수동 리셋' });
+      await writeAuditLog(supabase, admin, 'API 키 월 사용량 리셋', { target_type: 'system', target_id: service_slug, target_label: service_slug, detail: '월 사용량 수동 리셋' });
       return json({ success: true });
     }
 
     if (req.method === 'POST' && action === 'reset_all_monthly_usage') {
       const { error } = await supabase.from('api_keys').update({ monthly_used: 0, limit_notified_at: null, updated_at: new Date().toISOString() });
       if (error) return err(error.message);
-      await safeAuditLog(supabase, { admin_email: 'system', action: '전체 API 키 월 사용량 리셋', target_type: 'system', target_id: 'api_keys', target_label: '전체 서비스', result: 'success', detail: '월초 자동 리셋' });
+      await writeAuditLog(supabase, admin, '전체 API 키 월 사용량 리셋', { target_type: 'system', target_id: 'api_keys', target_label: '전체 서비스', detail: '월초 일괄 리셋' });
       return json({ success: true });
     }
 
@@ -608,7 +624,7 @@ Deno.serve(async (req) => {
       const upserts = Object.entries(settings).map(([key, value]) => ({ category, setting_key: key, setting_value: String(value), updated_at: new Date().toISOString() }));
       const { error } = await supabase.from('ai_model_settings').upsert(upserts, { onConflict: 'category,setting_key' });
       if (error) return err(error.message);
-      await safeAuditLog(supabase, { admin_email: 'admin', action: 'AI 모델 설정 변경', target_type: 'system', target_id: category, target_label: `${category} 모델 설정`, result: 'success', detail: JSON.stringify(settings).slice(0, 200) });
+      await writeAuditLog(supabase, admin, 'AI 모델 설정 변경', { target_type: 'system', target_id: category, target_label: `${category} 모델 설정`, detail: JSON.stringify(settings).slice(0, 200) });
       return json({ success: true });
     }
 
@@ -631,7 +647,7 @@ Deno.serve(async (req) => {
       const updates = costs.map((c) => ({ category: c.category, model_id: c.model_id, cost: Math.max(0, Math.round(c.cost)), is_active: c.is_active ?? true, updated_at: new Date().toISOString() }));
       const { error } = await supabase.from('credit_costs').upsert(updates, { onConflict: 'category,model_id' });
       if (error) return err(error.message);
-      await safeAuditLog(supabase, { admin_email: 'admin', action: '크레딧 비용 설정 변경', target_type: 'system', target_id: 'credit_costs', target_label: '크레딧 비용 설정', result: 'success', detail: `${updates.length}개 항목 업데이트` });
+      await writeAuditLog(supabase, admin, '크레딧 비용 설정 변경', { target_type: 'system', target_id: 'credit_costs', target_label: '크레딧 비용 설정', detail: `${updates.length}개 항목 업데이트` });
       return json({ success: true, updated: updates.length });
     }
 

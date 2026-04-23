@@ -32,15 +32,18 @@ These tests run against the **built** app with the `.env` in place, so:
 ## Current coverage
 
 - `smoke.spec.ts` — app boot, 404, lazy-route loading, toast region
+- `admin.spec.ts` — AdminGuard redirect, admin-login form rendering and validation
+- `credits.spec.ts` — credit-purchase page packages, title, balance header
+- `navigation.spec.ts` — public route console-error gate across /, /terms, /privacy,
+  /customer-support, /credit-purchase + NotFound
+- `customer-support.spec.ts` — FAQ section and inquiry-form rendering
 
-As flows stabilize, add suites for:
+Still to add as flows stabilize:
 
-- **auth.spec.ts**: login modal open/close, signup validation
-- **credits.spec.ts**: credit purchase page renders, package selection
-- **admin.spec.ts**: admin-login redirect, admin guard gating
-  (stub the session + the `admin-stats?action=check_admin` response)
 - **generate.spec.ts**: end-to-end image generation happy path
   (requires stubbing the Edge Function response)
+- **ai-board.spec.ts**: new project, shot add/delete, cut-count dialog
+  (requires a logged-in session stub)
 
 ## CI
 
