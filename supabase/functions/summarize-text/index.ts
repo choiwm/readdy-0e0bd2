@@ -1,23 +1,33 @@
+import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { requireUser, AuthFailure } from '../_shared/auth.ts';
-
-const corsHeaders = {
-  "Access-Control-Allow-Origin": "*",
-  "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
-  "Access-Control-Allow-Methods": "POST, OPTIONS",
-};
+import { buildCorsHeaders, handlePreflight } from '../_shared/cors.ts';
+import { checkRateLimit, rateLimitedResponse, POLICIES } from '../_shared/rateLimit.ts';
 
 serve(async (req) => {
-  if (req.method === "OPTIONS") {
-    return new Response("ok", { headers: corsHeaders });
-  }
+  if (req.method === "OPTIONS") return handlePreflight(req);
 
+  const corsHeaders = buildCorsHeaders(req);
+
+  let authedUserId: string;
   try {
-    await requireUser(req);
+    const authed = await requireUser(req);
+    authedUserId = authed.id;
   } catch (e) {
     if (e instanceof AuthFailure) return e.response;
     throw e;
   }
+
+  // Supabase client solely for rate-limit bookkeeping.
+  const supabase = createClient(
+    Deno.env.get('SUPABASE_URL')!,
+    Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!,
+  );
+  const _rl = await checkRateLimit(supabase, {
+    bucket: `summarize-text:${authedUserId}`,
+    ...POLICIES.summarizeText,
+  });
+  if (!_rl.ok) return rateLimitedResponse(_rl.resetAt, corsHeaders);
 
   try {
     const OPENAI_API_KEY = Deno.env.get("OPENAI_API_KEY");

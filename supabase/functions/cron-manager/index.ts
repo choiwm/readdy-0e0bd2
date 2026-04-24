@@ -1,5 +1,6 @@
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
 import { requireAdmin, AuthFailure } from '../_shared/auth.ts';
+import { buildCorsHeaders, handlePreflight } from '../_shared/cors.ts';
 
 // 허용되는 식별자 문자만 통과 — SQL 문자열 보간에 사용되는 값 검증
 const SAFE_IDENT = /^[a-z0-9_-]{1,64}$/i;
@@ -15,22 +16,6 @@ function assertSafeCron(value: string): void {
   if (!SAFE_CRON.test(value)) {
     throw new Error('Invalid cron expression');
   }
-}
-
-const corsHeaders = {
-  'Access-Control-Allow-Origin': '*',
-  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
-  'Access-Control-Allow-Methods': 'GET, POST, PUT, PATCH, DELETE, OPTIONS',
-};
-
-function json(data: unknown, status = 200) {
-  return new Response(JSON.stringify(data), {
-    status,
-    headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-  });
-}
-function err(msg: string, status = 400) {
-  return json({ error: msg }, status);
 }
 
 // cron 표현식 → 사람이 읽기 쉬운 설명
@@ -83,8 +68,15 @@ function buildHealthcheckCommand(supabaseUrl: string, anonKey: string, slug?: st
 }
 
 Deno.serve(async (req) => {
-  if (req.method === 'OPTIONS') return new Response('ok', { headers: corsHeaders });
+  if (req.method === 'OPTIONS') return handlePreflight(req);
 
+  const corsHeaders = buildCorsHeaders(req);
+  const json = (data: unknown, status = 200) =>
+    new Response(JSON.stringify(data), {
+      status,
+      headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+    });
+  const err = (msg: string, status = 400) => json({ error: msg }, status);
   try {
     await requireAdmin(req);
   } catch (e) {

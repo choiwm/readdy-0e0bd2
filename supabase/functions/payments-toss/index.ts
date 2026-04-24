@@ -34,17 +34,17 @@ import {
   type AuthedUser,
 } from '../_shared/auth.ts';
 import { getPackageById } from '../_shared/credit_packages.ts';
+import { buildCorsHeaders, handlePreflight } from '../_shared/cors.ts';
+import { checkRateLimit, rateLimitedResponse, POLICIES } from '../_shared/rateLimit.ts';
 
-const corsHeaders = {
-  'Access-Control-Allow-Origin': '*',
-  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type, x-toss-webhook-secret',
-  'Access-Control-Allow-Methods': 'POST, OPTIONS',
-};
-
-function jsonResponse(data: unknown, status = 200): Response {
+// File-scope helper: all handler functions below are defined at module level
+// (not inside the Deno.serve closure) so they cannot capture a per-request
+// `buildCorsHeaders(req)` via closure. Instead every call site passes `req`
+// explicitly as the third arg.
+function jsonResponse(data: unknown, status: number, req: Request): Response {
   return new Response(JSON.stringify(data), {
     status,
-    headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+    headers: { ...buildCorsHeaders(req), 'Content-Type': 'application/json' },
   });
 }
 
@@ -86,10 +86,20 @@ function secureEquals(a: string, b: string): boolean {
 async function handleCreateOrder(req: Request, user: AuthedUser): Promise<Response> {
   const body = await req.json().catch(() => ({}));
   const packageId = String(body.package_id ?? '').trim();
-  if (!packageId) return jsonResponse({ error: 'package_id required' }, 400);
+  if (!packageId) return jsonResponse({ error: 'package_id required' }, 400, req);
 
   const pkg = getPackageById(packageId);
-  if (!pkg) return jsonResponse({ error: 'unknown package' }, 400);
+  if (!pkg) return jsonResponse({ error: 'unknown package' }, 400, req);
+
+  const supabase = getAdminClient();
+
+  // Rate-limit order creation to stop a tampered client from spamming pending
+  // rows and cluttering the `payments` table / Toss merchant dashboard.
+  const rl = await checkRateLimit(supabase, {
+    bucket: `payments-create-order:${user.id}`,
+    ...POLICIES.paymentsCreateOrder,
+  });
+  if (!rl.ok) return rateLimitedResponse(rl.resetAt, buildCorsHeaders(req));
 
   // Generate a unique order_id. Toss requires alphanumeric + '-_' only,
   // length 6–64. We use ts + random for uniqueness + grep-ability.
@@ -97,7 +107,6 @@ async function handleCreateOrder(req: Request, user: AuthedUser): Promise<Respon
   const rand = Math.random().toString(36).slice(2, 10);
   const orderId = `cr_${ts}_${rand}`;
 
-  const supabase = getAdminClient();
   const { error: insertErr } = await supabase.from('payments').insert({
     order_id: orderId,
     user_id: user.id,
@@ -108,7 +117,7 @@ async function handleCreateOrder(req: Request, user: AuthedUser): Promise<Respon
   });
   if (insertErr) {
     console.error('[payments-toss] insert pending payment failed:', insertErr);
-    return jsonResponse({ error: 'db_error' }, 500);
+    return jsonResponse({ error: 'db_error' }, 500, req);
   }
 
   // Lookup the user's display name for Toss order naming.
@@ -125,7 +134,7 @@ async function handleCreateOrder(req: Request, user: AuthedUser): Promise<Respon
     order_name: `${pkg.name} — ${pkg.credits.toLocaleString()} CR`,
     customer_email: user.email,
     customer_name: profile?.display_name ?? user.email.split('@')[0],
-  });
+  }, 200, req);
 }
 
 async function handleConfirm(req: Request, user: AuthedUser): Promise<Response> {
@@ -135,7 +144,7 @@ async function handleConfirm(req: Request, user: AuthedUser): Promise<Response> 
   const amount = Number(body.amount);
 
   if (!paymentKey || !orderId || !Number.isFinite(amount)) {
-    return jsonResponse({ error: 'paymentKey, orderId, amount required' }, 400);
+    return jsonResponse({ error: 'paymentKey, orderId, amount required' }, 400, req);
   }
 
   const supabase = getAdminClient();
@@ -148,10 +157,10 @@ async function handleConfirm(req: Request, user: AuthedUser): Promise<Response> 
     .maybeSingle();
 
   if (selectErr || !payment) {
-    return jsonResponse({ error: 'order_not_found' }, 404);
+    return jsonResponse({ error: 'order_not_found' }, 404, req);
   }
   if (payment.user_id !== user.id) {
-    return jsonResponse({ error: 'forbidden' }, 403);
+    return jsonResponse({ error: 'forbidden' }, 403, req);
   }
 
   // Idempotency: if already confirmed, just return.
@@ -166,16 +175,16 @@ async function handleConfirm(req: Request, user: AuthedUser): Promise<Response> 
       already_confirmed: true,
       credits_granted: payment.credits,
       new_balance: profile?.credit_balance ?? null,
-    });
+    }, 200, req);
   }
   if (payment.status !== 'pending') {
-    return jsonResponse({ error: `payment_status_${payment.status}` }, 409);
+    return jsonResponse({ error: `payment_status_${payment.status}` }, 409, req);
   }
 
   // 2) The amount the client claimed AND the amount in our DB must match.
   if (payment.amount !== amount) {
     console.warn('[payments-toss] amount mismatch', { orderId, db: payment.amount, client: amount });
-    return jsonResponse({ error: 'amount_mismatch' }, 400);
+    return jsonResponse({ error: 'amount_mismatch' }, 400, req);
   }
 
   // 3) Call Toss confirm API — Toss is the final source of truth.
@@ -200,11 +209,11 @@ async function handleConfirm(req: Request, user: AuthedUser): Promise<Response> 
         error: 'toss_confirm_failed',
         toss_code: tossData?.code,
         toss_message: tossData?.message,
-      }, 400);
+      }, 400, req);
     }
   } catch (e) {
     console.error('[payments-toss] Toss confirm network error', e);
-    return jsonResponse({ error: 'toss_network_error' }, 502);
+    return jsonResponse({ error: 'toss_network_error' }, 502, req);
   }
 
   // 4) Toss accepted — credit the user atomically via RPC and mark done.
@@ -261,7 +270,7 @@ async function handleConfirm(req: Request, user: AuthedUser): Promise<Response> 
     ok: true,
     credits_granted: payment.credits,
     new_balance: newBalance,
-  });
+  }, 200, req);
 }
 
 async function handleWebhook(req: Request): Promise<Response> {
@@ -269,11 +278,11 @@ async function handleWebhook(req: Request): Promise<Response> {
   const expected = Deno.env.get('TOSS_WEBHOOK_SECRET');
   if (!expected) {
     console.error('[payments-toss] TOSS_WEBHOOK_SECRET not set — webhook disabled');
-    return jsonResponse({ error: 'webhook_not_configured' }, 503);
+    return jsonResponse({ error: 'webhook_not_configured' }, 503, req);
   }
   const received = req.headers.get('x-toss-webhook-secret') ?? '';
   if (!secureEquals(received, expected)) {
-    return jsonResponse({ error: 'unauthorized' }, 401);
+    return jsonResponse({ error: 'unauthorized' }, 401, req);
   }
 
   const payload = await req.json().catch(() => ({}));
@@ -282,7 +291,7 @@ async function handleWebhook(req: Request): Promise<Response> {
   const orderId: string | undefined = data?.orderId;
   const status: string | undefined = data?.status;
 
-  if (!orderId) return jsonResponse({ error: 'orderId required' }, 400);
+  if (!orderId) return jsonResponse({ error: 'orderId required' }, 400, req);
 
   const supabase = getAdminClient();
 
@@ -317,14 +326,14 @@ async function handleWebhook(req: Request): Promise<Response> {
     console.warn('[payments-toss] webhook audit failed:', e);
   }
 
-  return jsonResponse({ ok: true });
+  return jsonResponse({ ok: true }, 200, req);
 }
 
 // ── Entry point ──────────────────────────────────────────────────────────────
 
 Deno.serve((req) => withAuth(async () => {
-  if (req.method === 'OPTIONS') return new Response(null, { headers: corsHeaders });
-  if (req.method !== 'POST') return jsonResponse({ error: 'method_not_allowed' }, 405);
+  if (req.method === 'OPTIONS') return handlePreflight(req);
+  if (req.method !== 'POST') return jsonResponse({ error: 'method_not_allowed' }, 405, req);
 
   const url = new URL(req.url);
   const action = url.searchParams.get('action') ?? '';
@@ -346,5 +355,5 @@ Deno.serve((req) => withAuth(async () => {
   if (action === 'create_order') return await handleCreateOrder(req, user);
   if (action === 'confirm')      return await handleConfirm(req, user);
 
-  return jsonResponse({ error: 'unknown action' }, 400);
+  return jsonResponse({ error: 'unknown action' }, 400, req);
 }));

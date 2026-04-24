@@ -1,12 +1,8 @@
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { requireUser, AuthFailure } from '../_shared/auth.ts';
-
-const corsHeaders = {
-  "Access-Control-Allow-Origin": "*",
-  "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
-  "Access-Control-Allow-Methods": "POST, OPTIONS",
-};
+import { buildCorsHeaders, handlePreflight } from '../_shared/cors.ts';
+import { checkRateLimit, rateLimitedResponse, POLICIES } from '../_shared/rateLimit.ts';
 
 const VIP_PLANS = ['enterprise', 'vip', 'admin'];
 const FALLBACK_CLEAN_COST = 10;
@@ -92,9 +88,9 @@ async function logUsage(supabase: ReturnType<typeof createClient>, opts: {
 }
 
 serve(async (req) => {
-  if (req.method === "OPTIONS") {
-    return new Response("ok", { headers: corsHeaders });
-  }
+  if (req.method === "OPTIONS") return handlePreflight(req);
+
+  const corsHeaders = buildCorsHeaders(req);
 
   let authedUserId: string;
   try {
@@ -107,6 +103,12 @@ serve(async (req) => {
 
   const supabase = createClient(Deno.env.get('SUPABASE_URL')!, Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!);
 
+
+  const _rl = await checkRateLimit(supabase, {
+    bucket: `clean-audio:${authedUserId}`,
+    ...POLICIES.cleanAudio,
+  });
+  if (!_rl.ok) return rateLimitedResponse(_rl.resetAt, buildCorsHeaders(req));
   try {
     const LALAL_KEY = Deno.env.get("LALAL_KEY");
     if (!LALAL_KEY) {
