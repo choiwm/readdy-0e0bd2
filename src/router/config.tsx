@@ -21,6 +21,8 @@ const AdminLogin = lazy(() => import("../pages/admin-login/page"));
 const CreditPurchase = lazy(() => import("../pages/credit-purchase/page"));
 const PaymentSuccess = lazy(() => import("../pages/payment-success/page"));
 const PaymentFail = lazy(() => import("../pages/payment-fail/page"));
+const MyPayments = lazy(() => import("../pages/my-payments/page"));
+const MyAccount = lazy(() => import("../pages/my-account/page"));
 
 const routes: RouteObject[] = [
   { path: "/", element: <ErrorBoundary><Home /></ErrorBoundary> },
@@ -41,6 +43,8 @@ const routes: RouteObject[] = [
   { path: "/credit-purchase", element: <ErrorBoundary><CreditPurchase /></ErrorBoundary> },
   { path: "/payment/success", element: <ErrorBoundary><PaymentSuccess /></ErrorBoundary> },
   { path: "/payment/fail", element: <ErrorBoundary><PaymentFail /></ErrorBoundary> },
+  { path: "/my/payments", element: <ErrorBoundary><MyPayments /></ErrorBoundary> },
+  { path: "/my/account", element: <ErrorBoundary><MyAccount /></ErrorBoundary> },
   { path: "*", element: <NotFound /> },
 ];
 

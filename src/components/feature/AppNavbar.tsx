@@ -147,6 +147,18 @@ export default function AppNavbar({ active, hideBottomNav = false }: AppNavbarPr
                   크레딧 충전
                 </button>
               </Link>
+              <Link to="/my/payments" onClick={() => setUserMenuOpen(false)}>
+                <button className="w-full flex items-center gap-3 px-4 py-2.5 text-sm text-zinc-300 hover:bg-zinc-800/60 hover:text-white transition-all cursor-pointer">
+                  <i className="ri-receipt-line text-indigo-400 text-base w-4 h-4 flex items-center justify-center" />
+                  결제 내역
+                </button>
+              </Link>
+              <Link to="/my/account" onClick={() => setUserMenuOpen(false)}>
+                <button className="w-full flex items-center gap-3 px-4 py-2.5 text-sm text-zinc-300 hover:bg-zinc-800/60 hover:text-white transition-all cursor-pointer">
+                  <i className="ri-settings-3-line text-zinc-400 text-base w-4 h-4 flex items-center justify-center" />
+                  계정 설정
+                </button>
+              </Link>
               <Link to="/customer-support" onClick={() => setUserMenuOpen(false)}>
                 <button className="w-full flex items-center gap-3 px-4 py-2.5 text-sm text-zinc-300 hover:bg-zinc-800/60 hover:text-white transition-all cursor-pointer">
                   <i className="ri-customer-service-2-line text-zinc-400 text-base w-4 h-4 flex items-center justify-center" />
