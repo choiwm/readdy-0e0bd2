@@ -1,22 +1,6 @@
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
 import { requireAdmin, AuthFailure, writeAuditLog, type AuthedAdmin } from '../_shared/auth.ts';
-
-const corsHeaders = {
-  'Access-Control-Allow-Origin': '*',
-  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
-  'Access-Control-Allow-Methods': 'GET, POST, PUT, PATCH, DELETE, OPTIONS',
-};
-
-function json(data: unknown, status = 200) {
-  return new Response(JSON.stringify(data), {
-    status,
-    headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-  });
-}
-
-function err(msg: string, status = 400) {
-  return json({ error: msg }, status);
-}
+import { buildCorsHeaders, handlePreflight } from '../_shared/cors.ts';
 
 // ── 암호화 키 파생: SHA-256 해시로 항상 정확히 32바이트 생성 ──
 // APP_JWT_SECRET 길이(88자든 32자든)에 상관없이 동일한 32바이트 키 보장
@@ -361,8 +345,15 @@ const SLUG_TO_NAME: Record<string, string> = {
 };
 
 Deno.serve(async (req) => {
-  if (req.method === 'OPTIONS') return new Response('ok', { headers: corsHeaders });
+  if (req.method === 'OPTIONS') return handlePreflight(req);
 
+  const corsHeaders = buildCorsHeaders(req);
+  const json = (data: unknown, status = 200) =>
+    new Response(JSON.stringify(data), {
+      status,
+      headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+    });
+  const err = (msg: string, status = 400) => json({ error: msg }, status);
   let admin: AuthedAdmin;
   try {
     admin = await requireAdmin(req);

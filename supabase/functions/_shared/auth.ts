@@ -1,16 +1,23 @@
 // deno-lint-ignore-file no-explicit-any
 import { createClient, type SupabaseClient } from 'https://esm.sh/@supabase/supabase-js@2';
+import { buildCorsHeaders } from './cors.ts';
 
+/**
+ * Default CORS headers used when no Request is available. Kept for backward
+ * compatibility with callers that imported `corsHeaders` directly. New code
+ * should use `buildCorsHeaders(req)` from ./cors.ts so the allowlist works.
+ */
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
   'Access-Control-Allow-Methods': 'GET, POST, PUT, PATCH, DELETE, OPTIONS',
 };
 
-function jsonResponse(data: unknown, status: number): Response {
+function jsonResponse(data: unknown, status: number, req?: Request): Response {
+  const headers = req ? buildCorsHeaders(req) : corsHeaders;
   return new Response(JSON.stringify(data), {
     status,
-    headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+    headers: { ...headers, 'Content-Type': 'application/json' },
   });
 }
 
@@ -40,14 +47,14 @@ export interface AuthedAdmin extends AuthedUser {
 export async function requireUser(req: Request): Promise<AuthedUser> {
   const auth = req.headers.get('Authorization');
   if (!auth?.startsWith('Bearer ')) {
-    throw new AuthFailure(jsonResponse({ error: 'unauthorized' }, 401));
+    throw new AuthFailure(jsonResponse({ error: "unauthorized" }, 401, req));
   }
   const jwt = auth.slice('Bearer '.length);
 
   const supabaseUrl = Deno.env.get('SUPABASE_URL');
   const anonKey = Deno.env.get('SUPABASE_ANON_KEY');
   if (!supabaseUrl || !anonKey) {
-    throw new AuthFailure(jsonResponse({ error: 'server_misconfigured' }, 500));
+    throw new AuthFailure(jsonResponse({ error: "server_misconfigured" }, 500, req));
   }
 
   const client = createClient(supabaseUrl, anonKey, {
@@ -56,7 +63,7 @@ export async function requireUser(req: Request): Promise<AuthedUser> {
 
   const { data, error } = await client.auth.getUser();
   if (error || !data.user || !data.user.email) {
-    throw new AuthFailure(jsonResponse({ error: 'unauthorized' }, 401));
+    throw new AuthFailure(jsonResponse({ error: "unauthorized" }, 401, req));
   }
 
   return { id: data.user.id, email: data.user.email, jwt };
@@ -72,7 +79,7 @@ export async function requireAdmin(req: Request): Promise<AuthedAdmin> {
   const supabaseUrl = Deno.env.get('SUPABASE_URL');
   const serviceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY');
   if (!supabaseUrl || !serviceKey) {
-    throw new AuthFailure(jsonResponse({ error: 'server_misconfigured' }, 500));
+    throw new AuthFailure(jsonResponse({ error: "server_misconfigured" }, 500, req));
   }
 
   const admin = createClient(supabaseUrl, serviceKey);
@@ -84,10 +91,10 @@ export async function requireAdmin(req: Request): Promise<AuthedAdmin> {
     .maybeSingle();
 
   if (error) {
-    throw new AuthFailure(jsonResponse({ error: 'forbidden' }, 403));
+    throw new AuthFailure(jsonResponse({ error: "forbidden" }, 403, req));
   }
   if (!data) {
-    throw new AuthFailure(jsonResponse({ error: 'forbidden' }, 403));
+    throw new AuthFailure(jsonResponse({ error: "forbidden" }, 403, req));
   }
 
   return { ...user, adminId: data.id, role: data.role ?? null };
@@ -100,17 +107,17 @@ export function requireSchedulerSecret(req: Request, envVar = 'SCHEDULER_SECRET'
   const expected = Deno.env.get(envVar);
   const received = req.headers.get('x-scheduler-secret') ?? '';
   if (!expected) {
-    throw new AuthFailure(jsonResponse({ error: 'server_misconfigured' }, 500));
+    throw new AuthFailure(jsonResponse({ error: "server_misconfigured" }, 500, req));
   }
   if (received.length !== expected.length) {
-    throw new AuthFailure(jsonResponse({ error: 'unauthorized' }, 401));
+    throw new AuthFailure(jsonResponse({ error: "unauthorized" }, 401, req));
   }
   let mismatch = 0;
   for (let i = 0; i < expected.length; i += 1) {
     mismatch |= expected.charCodeAt(i) ^ received.charCodeAt(i);
   }
   if (mismatch !== 0) {
-    throw new AuthFailure(jsonResponse({ error: 'unauthorized' }, 401));
+    throw new AuthFailure(jsonResponse({ error: "unauthorized" }, 401, req));
   }
 }
 

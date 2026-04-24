@@ -1,11 +1,7 @@
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
 import { requireUser, AuthFailure } from '../_shared/auth.ts';
-
-const corsHeaders = {
-  "Access-Control-Allow-Origin": "*",
-  "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
-  "Access-Control-Allow-Methods": "POST, OPTIONS",
-};
+import { buildCorsHeaders, handlePreflight } from '../_shared/cors.ts';
+import { checkRateLimit, rateLimitedResponse, POLICIES } from '../_shared/rateLimit.ts';
 
 const FAL_WHISPER_MODEL = "fal-ai/whisper";
 const VIP_PLANS = ['enterprise', 'vip', 'admin'];
@@ -165,8 +161,15 @@ function buildTranscriptResponse(data: Record<string, unknown>, withTimestamp: b
 }
 
 Deno.serve(async (req) => {
-  if (req.method === "OPTIONS") return new Response("ok", { headers: corsHeaders });
+  if (req.method === 'OPTIONS') return handlePreflight(req);
 
+  const corsHeaders = buildCorsHeaders(req);
+  const json = (data: unknown, status = 200) =>
+    new Response(JSON.stringify(data), {
+      status,
+      headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+    });
+  const err = (msg: string, status = 400) => json({ error: msg }, status);
   let authedUserId: string;
   try {
     const authed = await requireUser(req);
@@ -177,6 +180,12 @@ Deno.serve(async (req) => {
   }
 
   const supabase = createClient(Deno.env.get('SUPABASE_URL')!, Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!);
+
+  const _rl = await checkRateLimit(supabase, {
+    bucket: `generate-transcribe:${authedUserId}`,
+    ...POLICIES.generateTranscribe,
+  });
+  if (!_rl.ok) return rateLimitedResponse(_rl.resetAt, buildCorsHeaders(req));
   const SUPABASE_URL = Deno.env.get('SUPABASE_URL')!;
   const ANON_KEY = Deno.env.get('SUPABASE_ANON_KEY') ?? Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
 
