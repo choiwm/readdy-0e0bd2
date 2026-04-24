@@ -1,52 +1,61 @@
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
 import { requireUser, AuthFailure } from '../_shared/auth.ts';
-import { requireUser, AuthFailure } from '../_shared/auth.ts';
 import { buildCorsHeaders, handlePreflight } from '../_shared/cors.ts';
 import { checkRateLimit, rateLimitedResponse, POLICIES } from '../_shared/rateLimit.ts';
+import {
+  VERIFIED_FAL_VIDEO_MODELS,
+  resolveVideoModel,
+} from '../_shared/fal_video_models.ts';
 
-const T2V_MODELS: Record<string, string> = {
-  "wan25":            "fal-ai/wan-25-preview/text-to-video",
-  "wan-t2v":          "fal-ai/wan-t2v",
-  "kling-v1":         "fal-ai/kling-video/v1/standard/text-to-video",
-  "kling-v1.5":       "fal-ai/kling-video/v1.5/pro/text-to-video",
-  "kling-v2.1":       "fal-ai/kling-video/v2.1/standard/text-to-video",
-  "kling-v2.1-pro":   "fal-ai/kling-video/v2.1/pro/text-to-video",
-  "kling-v25-turbo":  "fal-ai/kling-video/v2.5-turbo/pro/text-to-video",
-  "kling-v3-pro":     "fal-ai/kling-video/v3/pro/text-to-video",
-  "veo3":             "fal-ai/veo3",
-};
+// Build per-direction lookup tables from the canonical registry. This keeps
+// the wire format unchanged (frontend still sends "kling-v1" etc.) while
+// removing the second copy of model paths.
+const T2V_MODELS: Record<string, string> = Object.fromEntries(
+  Object.entries(VERIFIED_FAL_VIDEO_MODELS).map(([k, v]) => [k, v.t2v]),
+);
+const I2V_MODELS: Record<string, string> = Object.fromEntries(
+  Object.entries(VERIFIED_FAL_VIDEO_MODELS)
+    .filter(([, v]) => v.i2v != null)
+    .map(([k, v]) => [k, v.i2v as string]),
+);
 
-const I2V_MODELS: Record<string, string> = {
-  "wan25":            "fal-ai/wan-25-preview/image-to-video",
-  "wan-t2v":          "fal-ai/wan-t2v",
-  "minimax":          "fal-ai/minimax-video/image-to-video",
-  "kling-v1":         "fal-ai/kling-video/v1/standard/image-to-video",
-  "kling-v1.5":       "fal-ai/kling-video/v1.5/pro/image-to-video",
-  "kling-v2.1":       "fal-ai/kling-video/v2.1/standard/image-to-video",
-  "kling-v2.1-pro":   "fal-ai/kling-video/v2.1/pro/image-to-video",
-  "kling-v25-turbo":  "fal-ai/kling-video/v2.5-turbo/standard/image-to-video",
-  "kling-v3-pro":     "fal-ai/kling-video/v3/pro/image-to-video",
-  "veo3":             "fal-ai/veo3",
-};
-
-const T2V_TO_I2V_MAP: Record<string, string> = {
-  "fal-ai/kling-video/v1/standard/text-to-video":     "fal-ai/kling-video/v1/standard/image-to-video",
-  "fal-ai/kling-video/v1.5/pro/text-to-video":        "fal-ai/kling-video/v1.5/pro/image-to-video",
-  "fal-ai/kling-video/v2.1/standard/text-to-video":   "fal-ai/kling-video/v2.1/standard/image-to-video",
-  "fal-ai/kling-video/v2.1/pro/text-to-video":        "fal-ai/kling-video/v2.1/pro/image-to-video",
-  "fal-ai/wan-25-preview/text-to-video":               "fal-ai/wan-25-preview/image-to-video",
-  "fal-ai/wan-t2v":                                    "fal-ai/wan-t2v",
-};
+// Reverse lookup: given a t2v fal path, find the matching i2v path.
+const T2V_TO_I2V_MAP: Record<string, string> = Object.fromEntries(
+  Object.values(VERIFIED_FAL_VIDEO_MODELS)
+    .filter((v) => v.i2v != null && v.t2v !== v.i2v)
+    .map((v) => [v.t2v, v.i2v as string]),
+);
 
 function resolveModelId(modelId: string, hasImage: boolean): string {
   if (!hasImage) return modelId;
+  // Models without a separate i2v variant — pass through unchanged.
   if (modelId.includes('veo3')) return modelId;
   if (modelId.includes('minimax')) return modelId;
   if (modelId === 'fal-ai/wan-t2v') return modelId;
   if (T2V_TO_I2V_MAP[modelId]) return T2V_TO_I2V_MAP[modelId];
+  // Generic naming convention fallback (works for variants we haven't
+  // registered yet but follow Kling's text-to-video / image-to-video pattern).
   if (modelId.includes('text-to-video')) return modelId.replace('text-to-video', 'image-to-video');
   return modelId;
 }
+
+// Surface preview/unverified models in logs so they're easy to spot in
+// Supabase Logs when debugging a generation failure.
+function warnIfPreviewModel(falPath: string): void {
+  const entry = Object.values(VERIFIED_FAL_VIDEO_MODELS).find(
+    (v) => v.t2v === falPath || v.i2v === falPath,
+  );
+  if (entry?.preview || (entry && !entry.verified)) {
+    console.warn(
+      `[generate-video] preview/unverified 모델 호출: ${entry.id} (${falPath}).`
+      + ' fal.ai 카탈로그에 없을 수 있습니다 — diagnostic-healthcheck로 검증하세요.',
+    );
+  }
+}
+
+// Re-export for any caller that imports T2V_MODELS / I2V_MODELS directly.
+// (none currently, but keeps the change non-breaking.)
+export { T2V_MODELS, I2V_MODELS, resolveVideoModel };
 
 const CREDIT_COSTS: Record<string, number> = {
   "fal-ai/wan-25-preview/text-to-video":              35,
@@ -501,8 +510,19 @@ Deno.serve(async (req) => {
     falModel=resolveModelId(model_id as string,hasImage);
     console.log(`[generate-video] model_id: ${model_id} → ${falModel} (hasImage=${hasImage})`);
   } else {
-    falModel=hasImage?(I2V_MODELS[model as string]??'fal-ai/kling-video/v1/standard/image-to-video'):(T2V_MODELS[model as string]??'fal-ai/kling-video/v1/standard/text-to-video');
+    const lookup = hasImage ? I2V_MODELS : T2V_MODELS;
+    const fallback = hasImage
+      ? 'fal-ai/kling-video/v1/standard/image-to-video'
+      : 'fal-ai/kling-video/v1/standard/text-to-video';
+    falModel = lookup[model as string] ?? fallback;
+    if (!lookup[model as string]) {
+      console.warn(
+        `[generate-video] 알 수 없는 모델 이름: "${model}" (hasImage=${hasImage}) — ${fallback}로 폴백.`
+        + ' supabase/functions/_shared/fal_video_models.ts의 VERIFIED_FAL_VIDEO_MODELS를 확인하세요.',
+      );
+    }
   }
+  warnIfPreviewModel(falModel);
 
   const creditCost=CREDIT_COSTS[falModel]??50;
   console.log(`[generate-video] 생성 모드: model=${falModel}, hasImage=${hasImage}, cost=${creditCost}CR`);
