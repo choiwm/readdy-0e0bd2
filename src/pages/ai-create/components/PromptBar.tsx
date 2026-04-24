@@ -1,4 +1,5 @@
 import { useState, useEffect, useRef, useMemo, useCallback } from 'react';
+import { logDev } from '@/lib/logger';
 import type { AppliedCharacter } from '../page';
 import { buildCharacterPrompt, buildAnglePrompt, buildLookPrompt, getCharacterAppearanceTags, type AppliedAngle, type AppliedLook } from '@/utils/characterPrompt';
 import { LOOK_OPTIONS } from '@/pages/ai-create/data/presets';
@@ -530,7 +531,7 @@ export default function PromptBar({
       return;
     }
     // [DEBUG] 크레딧 체크 완전 제거 - Edge Function이 처리
-    console.log('[PromptBar] handleGenerate 호출:', { model: selectedModel, type: activeTab, ratio: selectedRatio, promptLen: finalPrompt.length });
+    logDev('[PromptBar] handleGenerate 호출:', { model: selectedModel, type: activeTab, ratio: selectedRatio, promptLen: finalPrompt.length });
     if (onGenerate) onGenerate(finalPrompt || '상상하는 장면을 묘사해보세요...', selectedModel, activeTab, selectedRatio, currentCost);
     setShowPreview(false);
   };

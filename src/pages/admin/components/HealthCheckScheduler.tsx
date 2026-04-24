@@ -1,4 +1,5 @@
 import { useState, useEffect, useCallback } from 'react';
+import { logDev } from '@/lib/logger';
 import PgCronPanel from './PgCronPanel';
 import EmailAlertPanel from './EmailAlertPanel';
 import SlackAlertPanel from './SlackAlertPanel';
@@ -398,7 +399,7 @@ export default function HealthCheckScheduler({ isDark, onToast }: Props) {
       {viewMode === 'pgcron' && (
         <PgCronPanel
           isDark={isDark}
-          onToast={onToast ?? ((msg, type) => console.log(type, msg))}
+          onToast={onToast ?? ((msg, type) => logDev(type, msg))}
         />
       )}
 
@@ -406,7 +407,7 @@ export default function HealthCheckScheduler({ isDark, onToast }: Props) {
       {viewMode === 'email' && (
         <EmailAlertPanel
           isDark={isDark}
-          onToast={onToast ?? ((msg, type) => console.log(type, msg))}
+          onToast={onToast ?? ((msg, type) => logDev(type, msg))}
         />
       )}
 
@@ -414,7 +415,7 @@ export default function HealthCheckScheduler({ isDark, onToast }: Props) {
       {viewMode === 'slack' && (
         <SlackAlertPanel
           isDark={isDark}
-          onToast={onToast ?? ((msg, type) => console.log(type, msg))}
+          onToast={onToast ?? ((msg, type) => logDev(type, msg))}
         />
       )}
 

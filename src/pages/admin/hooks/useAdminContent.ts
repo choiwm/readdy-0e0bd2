@@ -1,4 +1,5 @@
 import { useCallback, useState } from 'react';
+import { logDev } from '@/lib/logger';
 import { getAuthorizationHeader } from '@/lib/env';
 import { supabase } from '@/lib/supabase';
 import type { TeamRecord } from '../types';
@@ -119,7 +120,7 @@ export function useAdminContent() {
         result: 'success',
       });
 
-      console.log('Content status updated:', audioRes, autoRes);
+      logDev('Content status updated:', audioRes, autoRes);
     } catch (e) {
       console.warn('Content status DB update failed:', e);
     }

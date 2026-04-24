@@ -1,85 +1,29 @@
-/* eslint-disable react-refresh/only-export-components */
 import { useState, useRef, useCallback, useEffect } from 'react';
+import { logDev } from '@/lib/logger';
 import { TvcTemplate } from '@/mocks/tvcSamples';
 import { supabase } from '@/lib/supabase';
 import { useAuth } from '@/hooks/useAuth';
 import { useCredits } from '@/hooks/useCredits';
 import { useNotifications } from '@/hooks/useNotifications';
 import { uploadProductImagesToStorage } from '@/pages/ai-ad/utils/uploadProductImage';
+import { getSessionId, pollImageResult, pollFalVideoResult } from '@/pages/ai-ad/utils/falPolling';
+import {
+  VIDEO_MODEL_OPTIONS,
+  IMAGE_COST_DISPLAY,
+  IMAGE_I2I_COST_DISPLAY,
+  VIDEO_BASE_COST,
+  getVideoCostDisplay,
+} from './adModelConfig';
 import SnsExportModal from './SnsExportModal';
 import GeneratingPanel from './GeneratingPanel';
 import ErrorPanel, { ErrorType } from './ErrorPanel';
+
+export { VIDEO_MODEL_OPTIONS, type VideoModelOption } from './adModelConfig';
 
 type OutputRatio = '16:9' | '9:16' | '1:1';
 type OutputRes = '1K' | '2K' | '4K';
 type OutputFmt = 'PNG' | 'JPG' | 'WEBP';
 type GenerationState = 'idle' | 'uploading' | 'generating' | 'done' | 'error';
-
-export interface VideoModelOption {
-  id: string;
-  label: string;
-  badge: string;
-  badgeColor: string;
-  desc: string;
-  speed: 'fast' | 'normal' | 'slow';
-  quality: 'standard' | 'high' | 'ultra';
-  costMultiplier: number; // 기본 비용 대비 배수
-  t2vModel: string;
-  i2vModel: string;
-  recommended?: boolean;
-}
-
-export const VIDEO_MODEL_OPTIONS: VideoModelOption[] = [
-  {
-    id: 'kling-v1',
-    label: 'Kling v1',
-    badge: '추천',
-    badgeColor: 'emerald',
-    desc: '안정적 · 표준 품질 · 검증됨',
-    speed: 'normal',
-    quality: 'standard',
-    costMultiplier: 1.0,
-    t2vModel: 'fal-ai/kling-video/v1/standard/text-to-video',
-    i2vModel: 'fal-ai/kling-video/v1/standard/image-to-video',
-    recommended: true,
-  },
-  {
-    id: 'kling-v25-turbo',
-    label: 'Kling 2.5 Turbo',
-    badge: '고품질',
-    badgeColor: 'rose',
-    desc: '유동적 모션 · 고품질',
-    speed: 'normal',
-    quality: 'high',
-    costMultiplier: 1.6,
-    t2vModel: 'fal-ai/kling-video/v2.5-turbo/pro/text-to-video',
-    i2vModel: 'fal-ai/kling-video/v2.5-turbo/standard/image-to-video',
-  },
-  {
-    id: 'kling-v3-pro',
-    label: 'Kling 3.0 Pro',
-    badge: '최고품질',
-    badgeColor: 'amber',
-    desc: '최상위 품질 · 커스텀 요소',
-    speed: 'slow',
-    quality: 'ultra',
-    costMultiplier: 2.5,
-    t2vModel: 'fal-ai/kling-video/v3/pro/text-to-video',
-    i2vModel: 'fal-ai/kling-video/v3/pro/image-to-video',
-  },
-  {
-    id: 'veo3',
-    label: 'Veo 3',
-    badge: 'Google',
-    badgeColor: 'sky',
-    desc: 'Google 모델 · 4K · 오디오',
-    speed: 'slow',
-    quality: 'ultra',
-    costMultiplier: 3.0,
-    t2vModel: 'fal-ai/veo3',
-    i2vModel: 'fal-ai/veo3',
-  },
-];
 
 export interface GenerationResult {
   type: 'image' | 'video';
@@ -100,191 +44,6 @@ interface AdDetailModalProps {
   onAddToMyWorks: (result: GenerationResult) => void;
   onGeneratingChange?: (generating: boolean) => void;
 }
-
-// 프론트 표시용 비용 (실제 차감은 Edge Function에서만 수행)
-// Flux Pro = 20CR, Kling v1 text-to-video = 50CR, image-to-video = 50CR
-// redux(image-to-image) = 22CR
-const IMAGE_COST_DISPLAY = 20;       // fal-ai/flux-pro
-const IMAGE_I2I_COST_DISPLAY = 22;   // fal-ai/flux-pro/v1/redux (image-to-image)
-const VIDEO_BASE_COST = 50;          // Kling v1 기준 기본 비용
-// 영상+이미지 파이프라인: 이미지 redux(22) + 영상 i2v = 72CR (기본 모델 기준)
-const VIDEO_WITH_IMAGE_BASE_COST = 72;
-
-function getVideoCostDisplay(modelId: string, hasProductImage: boolean): number {
-  const model = VIDEO_MODEL_OPTIONS.find((m) => m.id === modelId);
-  const multiplier = model?.costMultiplier ?? 1.0;
-  const base = hasProductImage ? VIDEO_WITH_IMAGE_BASE_COST : VIDEO_BASE_COST;
-  return Math.round(base * multiplier);
-}
-
-const SESSION_KEY = 'ai_ad_session_id';
-function getSessionId(): string {
-  let id = localStorage.getItem(SESSION_KEY);
-  if (!id) {
-    id = `ad_sess_${Date.now()}_${Math.random().toString(36).slice(2, 9)}`;
-    localStorage.setItem(SESSION_KEY, id);
-  }
-  return id;
-}
-
-/**
- * 이미지 생성 pending 폴링 — generate-image Edge Function 프록시 사용
- * maxAttempts=60, intervalMs=5000 → 최대 5분 대기
- */
-async function pollImageResult(
-  falModel: string,
-  requestId: string,
-  statusUrl?: string | null,
-  responseUrl?: string | null,
-  saveOpts?: Record<string, unknown>,
-  maxAttempts = 75,
-  intervalMs = 4000
-): Promise<string | null> {
-  let consecutiveErrors = 0;
-  for (let i = 0; i < maxAttempts; i++) {
-    await new Promise((r) => setTimeout(r, intervalMs));
-    try {
-      const { data, error } = await supabase.functions.invoke('generate-image', {
-        body: {
-          _poll: true,
-          request_id: requestId,
-          model: falModel,
-          status_url: statusUrl ?? undefined,
-          response_url: responseUrl ?? undefined,
-          save_opts: saveOpts,
-        },
-      });
-      if (error) {
-        consecutiveErrors++;
-        console.warn(`[pollImageResult] Edge Function 오류 (${consecutiveErrors}회):`, error.message);
-        if (consecutiveErrors >= 8) throw new Error(`이미지 폴링 연속 오류: ${error.message}`);
-        continue;
-      }
-      consecutiveErrors = 0;
-      if (data?.imageUrl) return data.imageUrl;
-      if (data?.status === 'FAILED') throw new Error(data.error ?? '이미지 생성 실패');
-      const queuePos = data?.queue_position;
-      console.log(`[pollImageResult] ${i + 1}/${maxAttempts}: status=${data?.status ?? 'IN_PROGRESS'}${queuePos != null ? `, queue_pos=${queuePos}` : ''}`);
-    } catch (e) {
-      if (e instanceof Error && (e.message.includes('실패') || e.message.includes('FAILED') || e.message.includes('오류'))) throw e;
-      consecutiveErrors++;
-      if (consecutiveErrors >= 8) throw new Error('이미지 폴링 중 반복 오류가 발생했습니다.');
-    }
-  }
-  return null;
-}
-
-// fal.ai error_type 중 재시도 가능한 타입 목록 (공식 문서 기준)
-const _FAL_RETRYABLE_ERROR_TYPES = new Set([
-  'request_timeout', 'startup_timeout', 'runner_scheduling_failure',
-  'runner_connection_timeout', 'runner_disconnected', 'runner_connection_refused',
-  'runner_connection_error', 'runner_incomplete_response', 'runner_server_error',
-  'internal_error',
-]);
-
-// 영구 실패 타입 — 재시도해도 소용 없음
-const FAL_PERMANENT_ERROR_TYPES = new Set([
-  'client_disconnected', 'client_cancelled', 'bad_request',
-  'auth_error', 'not_found', 'url_error',
-]);
-
-/**
- * Edge Function이 pending 반환 시 프론트에서 Edge Function 폴링 프록시를 통해 결과 확인
- * fal.ai API 키는 Edge Function 내부에서만 사용 (보안)
- * statusUrl: pending 응답에 포함된 status_url — Edge Function에 전달해 정확한 폴링
- * responseUrl: pending 응답에 포함된 response_url — COMPLETED 시 결과 조회에 사용
- * saveOpts: pending 시 반환된 save_opts — 폴링 완료 시 Edge Function에서 ad_works 저장
- * 절대 타임아웃: 20분 (1200초) — 이 시간이 지나면 무조건 포기
- */
-async function pollFalVideoResult(
-  falModel: string,
-  requestId: string,
-  statusUrl?: string,
-  responseUrl?: string,
-  saveOpts?: Record<string, unknown>,
-  onCancelRef?: React.MutableRefObject<boolean>,
-  onStepUpdate?: (step: string) => void
-): Promise<string | null> {
-  const ABSOLUTE_TIMEOUT_MS = 20 * 60 * 1000; // 20분 절대 타임아웃
-  const POLL_INTERVAL_MS = 6000; // 6초마다 폴링
-  const startTime = Date.now();
-  let consecutiveErrors = 0;
-  let attempt = 0;
-
-  while (true) {
-    const elapsed = Date.now() - startTime;
-    if (elapsed >= ABSOLUTE_TIMEOUT_MS) {
-      throw new Error('영상 생성 시간이 초과되었습니다 (20분). fal.ai 서버가 혼잡하거나 요청이 실패했을 수 있어요. 잠시 후 다시 시도해주세요.');
-    }
-
-    if (onCancelRef?.current) throw new Error('사용자가 생성을 취소했습니다.');
-
-    await new Promise((r) => setTimeout(r, POLL_INTERVAL_MS));
-    attempt++;
-
-    if (onCancelRef?.current) throw new Error('사용자가 생성을 취소했습니다.');
-
-    try {
-      const { data, error } = await supabase.functions.invoke('generate-video', {
-        body: {
-          _poll: true,
-          request_id: requestId,
-          model: falModel,
-          status_url: statusUrl,
-          response_url: responseUrl,
-          save_opts: saveOpts,
-        },
-      });
-
-      if (error) {
-        consecutiveErrors++;
-        console.warn(`[pollFalVideoResult] Edge Function 오류 (${consecutiveErrors}회):`, error.message);
-        if (consecutiveErrors >= 8) throw new Error(`영상 폴링 연속 오류: ${error.message}`);
-        continue;
-      }
-
-      consecutiveErrors = 0;
-
-      if (data?.videoUrl) return data.videoUrl;
-
-      if (data?.status === 'FAILED') {
-        const falErrorType: string | undefined = data.fal_error_type;
-        const errMsg: string = data.error ?? '영상 생성 실패';
-        const isPermanent: boolean = falErrorType ? FAL_PERMANENT_ERROR_TYPES.has(falErrorType) : false;
-
-        console.error(`[pollFalVideoResult] FAILED — error_type=${falErrorType}, msg=${errMsg}`);
-        if (isPermanent) throw new Error(errMsg);
-        throw new Error(errMsg);
-      }
-
-      const elapsedSec = Math.round(elapsed / 1000);
-      const queuePos = data?.queue_position;
-      const queuePosMsg = queuePos != null ? ` (대기열 ${queuePos}위)` : '';
-      console.log(`[pollFalVideoResult] 시도 ${attempt} (${elapsedSec}s): status=${data?.status ?? 'IN_PROGRESS'}, queue_pos=${queuePos ?? '-'}`);
-
-      // queue_position UI 업데이트
-      if (queuePos != null && queuePos > 0) {
-        onStepUpdate?.(`영상 렌더링 대기 중${queuePosMsg} — ${Math.floor(elapsedSec / 60)}분 ${elapsedSec % 60}초 경과`);
-      } else if (queuePos === 0 || data?.status === 'IN_PROGRESS') {
-        onStepUpdate?.(`영상 렌더링 진행 중... ${Math.floor(elapsedSec / 60)}분 ${elapsedSec % 60}초 경과`);
-      }
-
-    } catch (e) {
-      if (e instanceof Error && (
-        e.message.includes('취소') ||
-        e.message.includes('실패') ||
-        e.message.includes('FAILED') ||
-        e.message.includes('초과') ||
-        e.message.includes('timeout') ||
-        e.message.includes('fal.ai') ||
-        e.message.includes('오류')
-      )) throw e;
-      consecutiveErrors++;
-      if (consecutiveErrors >= 8) throw new Error('영상 폴링 중 반복 오류가 발생했습니다.');
-    }
-  }
-}
-
 
 
 export default function AdDetailModal({ template, productName, productDesc, sidebarProducts = [], onClose, onAddToMyWorks, onGeneratingChange }: AdDetailModalProps) {
@@ -493,7 +252,7 @@ export default function AdDetailModal({ template, productName, productDesc, side
     // [FIX] isVip를 컴포넌트 스코프에서 계산한 값 사용 (클로저 stale 방지)
     const currentIsVip = ['enterprise', 'vip', 'admin'].includes((profile?.plan ?? '').toLowerCase()) || credits >= 99990;
 
-    console.log(`[AdDetailModal] handleGenerate: type=${type}, plan=${profile?.plan}, credits=${credits}, isVip=${currentIsVip}, displayCost=${displayCost}`);
+    logDev(`[AdDetailModal] handleGenerate: type=${type}, plan=${profile?.plan}, credits=${credits}, isVip=${currentIsVip}, displayCost=${displayCost}`);
 
     if (!currentIsVip && credits < displayCost) {
       setGenError(`크레딧이 부족합니다. 필요: ${displayCost} CR, 보유: ${credits} CR`);
@@ -669,7 +428,7 @@ export default function AdDetailModal({ template, productName, productDesc, side
         }
 
         if (data?.ad_work_id) {
-          console.log('[AdDetailModal] ad_works 저장 완료 (Edge Function):', data.ad_work_id);
+          logDev('[AdDetailModal] ad_works 저장 완료 (Edge Function):', data.ad_work_id);
         }
 
       } else {
@@ -680,7 +439,7 @@ export default function AdDetailModal({ template, productName, productDesc, side
           setGenStep('1단계: 제품 이미지로 광고 이미지 생성 중...');
           setGenProgress(5);
 
-          console.log('[AdDetailModal] 1단계 이미지 생성 시작, image_url:', primaryImageUrl.slice(0, 100));
+          logDev('[AdDetailModal] 1단계 이미지 생성 시작, image_url:', primaryImageUrl.slice(0, 100));
 
           const step1Body = {
             prompt: buildPrompt('image', true),
@@ -696,7 +455,7 @@ export default function AdDetailModal({ template, productName, productDesc, side
             source: 'step1_temp',  // ai-ad 저장 제외용
           };
 
-          console.log('[AdDetailModal] 1단계 요청 바디 (image_url 포함 여부):', Boolean(step1Body.image_url));
+          logDev('[AdDetailModal] 1단계 요청 바디 (image_url 포함 여부):', Boolean(step1Body.image_url));
 
           const { data: imgData, error: imgError } = await supabase.functions.invoke('generate-image', {
             body: step1Body,
@@ -711,14 +470,14 @@ export default function AdDetailModal({ template, productName, productDesc, side
             throw new Error(imgData.error);
           }
 
-          console.log('[AdDetailModal] 1단계 응답:', JSON.stringify(imgData).slice(0, 200));
+          logDev('[AdDetailModal] 1단계 응답:', JSON.stringify(imgData).slice(0, 200));
 
           // pending 상태 처리 — Edge Function 타임아웃으로 request_id 반환 시 프론트에서 폴링
           let step1ImageUrl: string;
           if (imgData?.pending && imgData?.request_id) {
             actualCreditsUsed += imgData.credits_used ?? IMAGE_I2I_COST_DISPLAY;
             setGenStep('1단계: 광고 이미지 렌더링 대기 중...');
-            console.log('[AdDetailModal] 1단계 pending, 폴링 시작 request_id:', imgData.request_id);
+            logDev('[AdDetailModal] 1단계 pending, 폴링 시작 request_id:', imgData.request_id);
             const polledUrl = await pollImageResult(
               imgData.model ?? 'fal-ai/flux/dev/image-to-image',
               imgData.request_id,
@@ -730,12 +489,12 @@ export default function AdDetailModal({ template, productName, productDesc, side
             );
             if (!polledUrl) throw new Error('광고 이미지 생성 시간이 초과되었습니다 (6분). 잠시 후 다시 시도해주세요.');
             step1ImageUrl = polledUrl;
-            console.log('[AdDetailModal] 1단계 완료, 이미지 URL:', step1ImageUrl.slice(0, 80));
+            logDev('[AdDetailModal] 1단계 완료, 이미지 URL:', step1ImageUrl.slice(0, 80));
           } else if (!imgData?.imageUrl) {
             throw new Error(imgData?.error ?? '광고 이미지 생성 실패 (1단계) — 결과를 받지 못했습니다.');
           } else {
             step1ImageUrl = imgData.imageUrl;
-            console.log('[AdDetailModal] 1단계 즉시 완료, 이미지 URL:', step1ImageUrl.slice(0, 80));
+            logDev('[AdDetailModal] 1단계 즉시 완료, 이미지 URL:', step1ImageUrl.slice(0, 80));
           }
 
           // 1단계 완료 → 프로그레스 45%로 점프
@@ -778,7 +537,7 @@ export default function AdDetailModal({ template, productName, productDesc, side
             console.error('[AdDetailModal] 2단계 영상 서버 오류:', vidData.error);
             throw new Error(String(vidData.error));
           }
-          console.log('[AdDetailModal] 2단계 영상 응답:', JSON.stringify(vidData).slice(0, 200));
+          logDev('[AdDetailModal] 2단계 영상 응답:', JSON.stringify(vidData).slice(0, 200));
 
           // pending 응답 처리
           if (vidData?.pending && vidData?.request_id) {

@@ -1,4 +1,5 @@
 import { useState, useCallback, useEffect, useRef } from 'react';
+import { logDev } from '@/lib/logger';
 import { supabase } from '@/lib/supabase';
 import { useAuth, updateCachedCreditBalance } from '@/hooks/useAuth';
 
@@ -127,7 +128,7 @@ export function useCredits() {
 
       if (res.data?.sent) {
         markAlertSent();
-        console.log('[Credit Alert] In-app notification sent:', res.data.user_id);
+        logDev('[Credit Alert] In-app notification sent:', res.data.user_id);
       }
     } catch (e) {
       // 알림 실패는 조용히 무시 (UX 방해 금지)

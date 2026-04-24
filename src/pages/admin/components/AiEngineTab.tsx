@@ -6,56 +6,25 @@ import HealthCheckScheduler from './HealthCheckScheduler';
 import FailureLogsDrawer from './FailureLogsDrawer';
 import FalModelCatalog from './FalModelCatalog';
 import FalKeyManagerPanel from './FalKeyManagerPanel';
+import StatusDot from './StatusDot';
+import {
+  MODEL_LABELS,
+  BADGE_COLORS,
+  DEFAULT_SETTINGS,
+  ALL_IMAGE_MODELS,
+  ALL_VIDEO_MODELS,
+  ALL_FAL_MUSIC_MODELS,
+  SLUG_TO_DISPLAY,
+  DEFAULT_SERVICES,
+  GPU_INSTANCES,
+  safeJsonParse,
+  type ApiKeyRecord,
+  type UsageStats,
+  type ModelSettings,
+  type ApiService,
+} from './aiEngineData';
+import type { PromptTemplate } from '../types';
 import { getAuthorizationHeader } from '@/lib/env';
-
-// ── Types ──────────────────────────────────────────────────────────────────
-interface ApiKeyRecord {
-  id: string;
-  service_name: string;
-  service_slug: string;
-  key_hint: string | null;
-  status: 'active' | 'inactive' | 'error';
-  last_tested_at: string | null;
-  test_result: string | null;
-  monthly_limit: number;
-  monthly_used: number;
-  notes: string | null;
-  updated_at: string;
-}
-
-interface UsageStats {
-  [slug: string]: { total: number; success: number; failed: number; credits: number };
-}
-
-interface ModelSettings {
-  image: { active_model: string; available_models: string[] };
-  video: { active_model: string; available_models: string[] };
-  music: {
-    active_provider: string;
-    active_model: string;
-    available_fal_models: string[];
-    suno_enabled: string;
-  };
-}
-
-interface PromptTemplate {
-  id: string;
-  name: string;
-  category: string;
-  model: string;
-  lastUpdated: string;
-  usageCount: number;
-  active: boolean;
-}
-
-interface ApiService {
-  name: string;
-  status: string;
-  latency: string;
-  uptime: string;
-  requests: number;
-  errors: number;
-}
 
 interface Props {
   isDark: boolean;
@@ -73,125 +42,6 @@ interface Props {
   } | null;
   apiHealthLoading: boolean;
 }
-
-// ── Constants ──────────────────────────────────────────────────────────────
-const MODEL_LABELS: Record<string, { name: string; badge: string; desc: string }> = {
-  'fal-ai/flux/schnell':          { name: 'FLUX Schnell',       badge: '빠름',    desc: '가장 빠른 생성, 기본 품질' },
-  'fal-ai/flux/dev':              { name: 'FLUX Dev',           badge: '균형',    desc: '속도와 품질의 균형' },
-  'fal-ai/flux-pro':              { name: 'FLUX Pro',           badge: '고품질',  desc: '높은 품질, 상업용' },
-  'fal-ai/flux-pro/v1.1':         { name: 'FLUX Pro v1.1',      badge: '고품질',  desc: '개선된 Pro 버전' },
-  'fal-ai/flux-pro/v1.1-ultra':   { name: 'FLUX Pro Ultra',     badge: '최고품질', desc: '최고 품질, 느린 속도' },
-  'fal-ai/stable-diffusion-v3-medium': { name: 'SD v3 Medium', badge: '범용',    desc: 'Stable Diffusion v3' },
-  'fal-ai/kling-video/v1/standard/text-to-video':   { name: 'Kling v1 Standard', badge: '기본',    desc: '기본 영상 생성' },
-  'fal-ai/kling-video/v1.5/pro/text-to-video':      { name: 'Kling v1.5 Pro',    badge: '고품질',  desc: '향상된 품질' },
-  'fal-ai/kling-video/v2.1/standard/text-to-video': { name: 'Kling v2.1 Standard', badge: '최신',  desc: '최신 표준 모델' },
-  'fal-ai/kling-video/v2.1/pro/text-to-video':      { name: 'Kling v2.1 Pro',    badge: '최고',    desc: '최신 최고 품질' },
-  'fal-ai/minimax-video/image-to-video':            { name: 'MiniMax Video',      badge: '대안',    desc: 'MiniMax 영상 모델' },
-  'fal-ai/wan-t2v':                                 { name: 'WAN T2V',            badge: '대안',    desc: 'WAN 텍스트→영상' },
-  'fal-ai/stable-audio':  { name: 'Stable Audio',  badge: 'fal.ai', desc: '고품질 음악 생성' },
-  'fal-ai/musicgen':      { name: 'MusicGen',       badge: 'fal.ai', desc: 'Meta MusicGen' },
-  'suno':                 { name: 'Suno AI',        badge: 'Suno',   desc: '가사 포함 음악 생성' },
-};
-
-const BADGE_COLORS: Record<string, string> = {
-  '빠름':    'bg-emerald-500/15 text-emerald-400',
-  '균형':    'bg-indigo-500/15 text-indigo-400',
-  '고품질':  'bg-amber-500/15 text-amber-400',
-  '최고품질':'bg-red-500/15 text-red-400',
-  '최고':    'bg-red-500/15 text-red-400',
-  '최신':    'bg-violet-500/15 text-violet-400',
-  '범용':    'bg-zinc-500/15 text-zinc-400',
-  '기본':    'bg-zinc-500/15 text-zinc-400',
-  '대안':    'bg-cyan-500/15 text-cyan-400',
-  'fal.ai':  'bg-indigo-500/15 text-indigo-400',
-  'Suno':    'bg-emerald-500/15 text-emerald-400',
-};
-
-const DEFAULT_SETTINGS: ModelSettings = {
-  image: {
-    active_model: 'fal-ai/flux/dev',
-    available_models: [
-      'fal-ai/flux/schnell', 'fal-ai/flux/dev', 'fal-ai/flux-pro',
-      'fal-ai/flux-pro/v1.1', 'fal-ai/flux-pro/v1.1-ultra', 'fal-ai/stable-diffusion-v3-medium',
-    ],
-  },
-  video: {
-    active_model: 'fal-ai/kling-video/v1/standard/text-to-video',
-    available_models: [
-      'fal-ai/kling-video/v1/standard/text-to-video', 'fal-ai/kling-video/v1.5/pro/text-to-video',
-      'fal-ai/kling-video/v2.1/standard/text-to-video', 'fal-ai/kling-video/v2.1/pro/text-to-video',
-      'fal-ai/minimax-video/image-to-video', 'fal-ai/wan-t2v',
-    ],
-  },
-  music: {
-    active_provider: 'fal',
-    active_model: 'fal-ai/stable-audio',
-    available_fal_models: ['fal-ai/stable-audio', 'fal-ai/musicgen'],
-    suno_enabled: 'true',
-  },
-};
-
-const ALL_IMAGE_MODELS = [
-  'fal-ai/flux/schnell', 'fal-ai/flux/dev', 'fal-ai/flux-pro',
-  'fal-ai/flux-pro/v1.1', 'fal-ai/flux-pro/v1.1-ultra', 'fal-ai/stable-diffusion-v3-medium',
-];
-const ALL_VIDEO_MODELS = [
-  'fal-ai/kling-video/v1/standard/text-to-video', 'fal-ai/kling-video/v1.5/pro/text-to-video',
-  'fal-ai/kling-video/v2.1/standard/text-to-video', 'fal-ai/kling-video/v2.1/pro/text-to-video',
-  'fal-ai/minimax-video/image-to-video', 'fal-ai/wan-t2v',
-];
-const ALL_FAL_MUSIC_MODELS = ['fal-ai/stable-audio', 'fal-ai/musicgen'];
-
-// DB service_name 표시명 매핑 (slug → 표시명)
-const SLUG_TO_DISPLAY: Record<string, string> = {
-  fal:        'fal.ai (통합 AI)',
-  goapi:      'GoAPI (이미지/영상)',
-  elevenlabs: 'ElevenLabs (TTS/SFX)',
-  suno:       'Suno (음악)',
-  openai:     'OpenAI GPT-4o',
-  lalalai:    'LALAL.AI (오디오 클린)',
-  openrouter: 'OpenRouter (Claude/GPT/Gemini)',
-};
-
-// 기본 서비스 목록 — DB에 없어도 항상 표시
-const DEFAULT_SERVICES: ApiKeyRecord[] = [
-  { id: 'default-fal',        service_name: 'fal.ai (통합 AI)',                service_slug: 'fal',        key_hint: null, status: 'inactive', last_tested_at: null, test_result: null, monthly_limit: 0, monthly_used: 0, notes: null, updated_at: '' },
-  { id: 'default-goapi',      service_name: 'GoAPI (이미지/영상)',              service_slug: 'goapi',      key_hint: null, status: 'inactive', last_tested_at: null, test_result: null, monthly_limit: 0, monthly_used: 0, notes: null, updated_at: '' },
-  { id: 'default-elevenlabs', service_name: 'ElevenLabs (TTS/SFX)',            service_slug: 'elevenlabs', key_hint: null, status: 'inactive', last_tested_at: null, test_result: null, monthly_limit: 0, monthly_used: 0, notes: null, updated_at: '' },
-  { id: 'default-suno',       service_name: 'Suno (음악)',                      service_slug: 'suno',       key_hint: null, status: 'inactive', last_tested_at: null, test_result: null, monthly_limit: 0, monthly_used: 0, notes: null, updated_at: '' },
-  { id: 'default-openai',     service_name: 'OpenAI GPT-4o',                   service_slug: 'openai',     key_hint: null, status: 'inactive', last_tested_at: null, test_result: null, monthly_limit: 0, monthly_used: 0, notes: null, updated_at: '' },
-  { id: 'default-lalalai',    service_name: 'LALAL.AI (오디오 클린)',           service_slug: 'lalalai',    key_hint: null, status: 'inactive', last_tested_at: null, test_result: null, monthly_limit: 0, monthly_used: 0, notes: null, updated_at: '' },
-  { id: 'default-openrouter', service_name: 'OpenRouter (Claude/GPT/Gemini)',  service_slug: 'openrouter', key_hint: null, status: 'inactive', last_tested_at: null, test_result: null, monthly_limit: 0, monthly_used: 0, notes: null, updated_at: '' },
-];
-
-// ── Helper: safe JSON parse ────────────────────────────────────────────────
-function safeJsonParse<T>(val: unknown, fallback: T): T {
-  if (Array.isArray(val)) return val as unknown as T;
-  if (typeof val === 'string') {
-    try { return JSON.parse(val) as T; } catch { return fallback; }
-  }
-  return fallback;
-}
-
-// ── Status Dot ─────────────────────────────────────────────────────────────
-function StatusDot({ status }: { status: string }) {
-  const cls = status === 'active' || status === 'normal'
-    ? 'bg-emerald-400'
-    : status === 'warning'
-    ? 'bg-amber-400 animate-pulse'
-    : status === 'error' || status === 'inactive'
-    ? 'bg-red-400 animate-pulse'
-    : 'bg-zinc-500';
-  return <div className={`w-2 h-2 rounded-full flex-shrink-0 ${cls}`} />;
-}
-
-// ── GPU Mock Data (실시간 시뮬레이션) ─────────────────────────────────────
-const GPU_INSTANCES = [
-  { name: 'GPU-01 (이미지)', baseLoad: 65, baseMem: 62, color: 'bg-indigo-500', icon: 'ri-image-ai-line', iconColor: 'text-indigo-400', bg: 'bg-indigo-500/10' },
-  { name: 'GPU-02 (영상)',   baseLoad: 82, baseMem: 78, color: 'bg-amber-500',  icon: 'ri-video-ai-line', iconColor: 'text-amber-400',  bg: 'bg-amber-500/10' },
-  { name: 'GPU-03 (음성)',   baseLoad: 41, baseMem: 48, color: 'bg-emerald-500', icon: 'ri-music-2-line', iconColor: 'text-emerald-400', bg: 'bg-emerald-500/10' },
-  { name: 'GPU-04 (예비)',   baseLoad: 10, baseMem: 18, color: 'bg-zinc-500',   icon: 'ri-server-line',  iconColor: 'text-zinc-400',   bg: 'bg-zinc-500/10' },
-];
 
 // ── Main Component ─────────────────────────────────────────────────────────
 export default function AiEngineTab({
