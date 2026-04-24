@@ -2,75 +2,9 @@ import { useState, useEffect, useCallback } from 'react';
 import { Link } from 'react-router-dom';
 import { useCredits } from '@/hooks/useCredits';
 import { useAuth } from '@/hooks/useAuth';
-import { getAuthorizationHeader } from '@/lib/env';
-
-const CREDIT_PACKAGES = [
-  {
-    id: 'starter',
-    name: 'Starter',
-    credits: 500,
-    price: 4.9,
-    priceKRW: 6900,
-    popular: false,
-    color: 'from-zinc-700/40 to-zinc-800/40',
-    border: 'border-zinc-700/40',
-    badge: null,
-    perCredit: '₩13.8',
-    features: ['이미지 생성 약 50회', 'TTS 약 250회', '음악 생성 약 33회'],
-  },
-  {
-    id: 'basic',
-    name: 'Basic',
-    credits: 1500,
-    price: 12.9,
-    priceKRW: 17900,
-    popular: false,
-    color: 'from-indigo-900/30 to-zinc-800/40',
-    border: 'border-indigo-700/30',
-    badge: null,
-    perCredit: '₩11.9',
-    features: ['이미지 생성 약 150회', 'TTS 약 750회', '음악 생성 약 100회'],
-  },
-  {
-    id: 'pro',
-    name: 'Pro',
-    credits: 4000,
-    price: 29.9,
-    priceKRW: 41900,
-    popular: true,
-    color: 'from-indigo-600/20 to-violet-700/20',
-    border: 'border-indigo-500/40',
-    badge: '가장 인기',
-    perCredit: '₩10.5',
-    features: ['이미지 생성 약 400회', 'TTS 약 2,000회', '음악 생성 약 266회', '영상 생성 약 80회'],
-  },
-  {
-    id: 'creator',
-    name: 'Creator',
-    credits: 10000,
-    price: 64.9,
-    priceKRW: 89900,
-    popular: false,
-    color: 'from-violet-900/20 to-indigo-900/20',
-    border: 'border-violet-600/30',
-    badge: '20% 절약',
-    perCredit: '₩9.0',
-    features: ['이미지 생성 약 1,000회', 'TTS 약 5,000회', '음악 생성 약 666회', '영상 생성 약 200회', '우선 처리'],
-  },
-  {
-    id: 'studio',
-    name: 'Studio',
-    credits: 30000,
-    price: 169.9,
-    priceKRW: 239000,
-    popular: false,
-    color: 'from-amber-900/15 to-orange-900/15',
-    border: 'border-amber-600/25',
-    badge: '35% 절약',
-    perCredit: '₩8.0',
-    features: ['이미지 생성 약 3,000회', 'TTS 약 15,000회', '음악 생성 약 2,000회', '영상 생성 약 600회', '우선 처리', '전담 지원'],
-  },
-];
+import { getAuthorizationHeader, SUPABASE_URL } from '@/lib/env';
+import { getTossPayments } from '@/lib/toss';
+import { CREDIT_PACKAGES } from './packages';
 
 const USAGE_GUIDE = [
   { icon: 'ri-image-ai-line', label: 'AI 이미지 생성', color: 'text-indigo-400', bg: 'bg-indigo-500/10', items: [
@@ -159,6 +93,8 @@ function useCreditAlertSettings(userId: string | null) {
   return { settings, setSettings, save, saving, saved };
 }
 
+type PaymentMethod = '카드' | '계좌이체' | '가상계좌';
+
 export default function CreditPurchasePage() {
   const { credits } = useCredits();
   const { isLoggedIn, profile } = useAuth();
@@ -166,6 +102,9 @@ export default function CreditPurchasePage() {
   const [openFaq, setOpenFaq] = useState<number | null>(null);
   const [showPaymentModal, setShowPaymentModal] = useState(false);
   const [showAlertSettings, setShowAlertSettings] = useState(false);
+  const [paymentMethod, setPaymentMethod] = useState<PaymentMethod>('카드');
+  const [paying, setPaying] = useState(false);
+  const [payError, setPayError] = useState<string | null>(null);
 
   const { settings: alertSettings, setSettings: setAlertSettings, save: saveAlertSettings, saving: alertSaving, saved: alertSaved } =
     useCreditAlertSettings(isLoggedIn && profile ? profile.id : null);
@@ -185,13 +124,58 @@ export default function CreditPurchasePage() {
 
   const handleBuyClick = (pkgId: string) => {
     setSelectedPackage(pkgId);
+    setPayError(null);
     setShowPaymentModal(true);
   };
 
-  const _handlePaymentConfirm = () => {
-    // 결제 시스템 준비 중 — 실제 결제 연동 전까지 고객지원으로 안내
-    // 절대로 크레딧을 직접 지급하지 않음
-    setShowPaymentModal(false);
+  // ── 결제 시작: create_order → tossPayments.requestPayment → 토스 결제창 ──
+  const handlePaymentConfirm = async () => {
+    if (!selectedPkg) return;
+    if (!isLoggedIn || !profile) {
+      setPayError('결제하려면 먼저 로그인해주세요.');
+      return;
+    }
+
+    setPaying(true);
+    setPayError(null);
+
+    try {
+      // 1) Edge Function에 주문 생성 요청 → orderId 받기
+      const res = await fetch(
+        `${SUPABASE_URL}/functions/v1/payments-toss?action=create_order`,
+        {
+          method: 'POST',
+          headers: {
+            'Authorization': getAuthorizationHeader(),
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({ package_id: selectedPkg.id }),
+        },
+      );
+      const order = await res.json();
+      if (!res.ok || !order?.order_id) {
+        throw new Error(order?.error ?? '주문 생성에 실패했습니다.');
+      }
+
+      // 2) Toss SDK 호출 → 결제창 오픈 (이후 successUrl/failUrl 로 리다이렉트)
+      const toss = await getTossPayments();
+      const origin = window.location.origin;
+      await toss.requestPayment(paymentMethod, {
+        amount: order.amount,
+        orderId: order.order_id,
+        orderName: order.order_name,
+        customerEmail: order.customer_email,
+        customerName: order.customer_name,
+        successUrl: `${origin}/payment/success`,
+        failUrl: `${origin}/payment/fail`,
+      });
+      // 정상 흐름: 위 호출은 redirect 가 일어나므로 이 아래는 도달하지 않음
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : '결제 진행 중 오류가 발생했습니다.';
+      // 사용자가 결제창을 닫은 경우 (USER_CANCEL) 는 별도 처리 가능 — 일단 메시지만 노출
+      setPayError(msg);
+      setPaying(false);
+    }
   };
 
   return (
@@ -642,31 +626,72 @@ export default function CreditPurchasePage() {
                 </div>
               </div>
 
-              {/* Payment notice */}
-              <div className="flex items-start gap-2.5 px-4 py-3 rounded-xl bg-indigo-500/8 border border-indigo-500/20">
-                <i className="ri-information-line text-indigo-400 text-sm mt-0.5 flex-shrink-0" />
-                <div>
-                  <p className="text-xs font-bold text-indigo-400 mb-0.5">구매 문의 안내</p>
-                  <p className="text-[11px] text-zinc-400 leading-relaxed">
-                    아래 고객지원 버튼을 눌러 구매를 진행해 주세요. 선택하신 패키지 정보와 함께 문의하시면 빠르게 처리해 드립니다.
-                  </p>
+              {/* Payment method picker */}
+              <div>
+                <p className="text-xs font-bold text-zinc-400 mb-2">결제 수단</p>
+                <div className="grid grid-cols-3 gap-2">
+                  {(['카드', '계좌이체', '가상계좌'] as PaymentMethod[]).map((m) => {
+                    const active = paymentMethod === m;
+                    const icon = m === '카드' ? 'ri-bank-card-line' : m === '계좌이체' ? 'ri-bank-line' : 'ri-wallet-3-line';
+                    return (
+                      <button
+                        key={m}
+                        onClick={() => setPaymentMethod(m)}
+                        className={`flex flex-col items-center gap-1.5 py-3 rounded-xl border text-xs font-bold cursor-pointer transition-all whitespace-nowrap ${
+                          active
+                            ? 'bg-indigo-500/15 border-indigo-500/40 text-indigo-300'
+                            : 'bg-zinc-800/60 border-white/5 text-zinc-400 hover:border-white/15'
+                        }`}
+                      >
+                        <i className={`${icon} text-base ${active ? 'text-indigo-400' : 'text-zinc-500'}`} />
+                        {m}
+                      </button>
+                    );
+                  })}
                 </div>
               </div>
 
+              {/* Login required notice */}
+              {!isLoggedIn && (
+                <div className="flex items-start gap-2.5 px-4 py-3 rounded-xl bg-amber-500/8 border border-amber-500/20">
+                  <i className="ri-information-line text-amber-400 text-sm mt-0.5 flex-shrink-0" />
+                  <p className="text-[11px] text-zinc-400 leading-relaxed">
+                    결제하려면 먼저 로그인해주세요.
+                  </p>
+                </div>
+              )}
+
+              {/* Error banner */}
+              {payError && (
+                <div className="flex items-start gap-2.5 px-4 py-3 rounded-xl bg-red-500/8 border border-red-500/20">
+                  <i className="ri-error-warning-line text-red-400 text-sm mt-0.5 flex-shrink-0" />
+                  <p className="text-[11px] text-zinc-300 leading-relaxed">{payError}</p>
+                </div>
+              )}
+
               <div className="grid grid-cols-1 gap-3">
-                <Link to="/customer-support" onClick={() => setShowPaymentModal(false)}>
-                  <button className="w-full py-3.5 bg-gradient-to-r from-indigo-500 to-violet-500 hover:from-indigo-400 hover:to-violet-400 text-white font-bold text-sm rounded-xl transition-all cursor-pointer flex items-center justify-center gap-2">
-                    <i className="ri-mail-send-line" />
-                    고객지원으로 문의하기
-                  </button>
-                </Link>
+                <button
+                  onClick={handlePaymentConfirm}
+                  disabled={paying || !isLoggedIn}
+                  className="w-full py-3.5 bg-gradient-to-r from-indigo-500 to-violet-500 hover:from-indigo-400 hover:to-violet-400 disabled:opacity-50 disabled:cursor-not-allowed text-white font-bold text-sm rounded-xl transition-all cursor-pointer flex items-center justify-center gap-2"
+                >
+                  {paying ? (
+                    <><i className="ri-loader-4-line animate-spin" /> 결제창 여는 중...</>
+                  ) : (
+                    <><i className="ri-secure-payment-line" /> ₩{selectedPkg.priceKRW.toLocaleString()} 결제하기</>
+                  )}
+                </button>
                 <button
                   onClick={() => setShowPaymentModal(false)}
-                  className="w-full py-3 bg-zinc-800/60 hover:bg-zinc-700/60 border border-white/5 text-zinc-400 font-bold text-sm rounded-xl transition-all cursor-pointer flex items-center justify-center gap-2"
+                  disabled={paying}
+                  className="w-full py-3 bg-zinc-800/60 hover:bg-zinc-700/60 border border-white/5 text-zinc-400 font-bold text-sm rounded-xl transition-all cursor-pointer flex items-center justify-center gap-2 disabled:opacity-50"
                 >
-                  닫기
+                  취소
                 </button>
               </div>
+              <p className="text-[10px] text-zinc-600 text-center">
+                결제는 토스페이먼츠를 통해 안전하게 처리됩니다.
+              </p>
             </div>
           </div>
         </div>
