@@ -26,7 +26,7 @@ function dbToProject(row: AutomationProjectDB): AutomationProject {
     views: row.views,
     likes: row.likes,
     model: row.model,
-    mode: row.mode,
+    mode: row.mode as 'AutoPilot' | 'Manual',
     cuts: row.cuts,
     progress: row.progress ?? undefined,
     createdAt: row.created_at,

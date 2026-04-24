@@ -1,4 +1,5 @@
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
+import { requireUser, AuthFailure } from '../_shared/auth.ts';
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -568,6 +569,15 @@ async function handlePollMode(
 Deno.serve(async (req) => {
   if (req.method === 'OPTIONS') return new Response('ok', { headers: corsHeaders });
 
+  let authedUserId: string;
+  try {
+    const authed = await requireUser(req);
+    authedUserId = authed.id;
+  } catch (e) {
+    if (e instanceof AuthFailure) return e.response;
+    throw e;
+  }
+
   const supabase = createClient(
     Deno.env.get('SUPABASE_URL')!,
     Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!
@@ -597,7 +607,7 @@ Deno.serve(async (req) => {
     const {
       prompt, model = 'Flux Realism', model_id,
       ratio = '16:9', aspectRatio, shotType, mode = 'default',
-      user_id, session_id, image_url, image_strength = 0.85,
+      session_id, image_url, image_strength = 0.85,
       source, template_id, template_title, product_name, product_desc,
       resolution = '1K', format = 'PNG',
       seed,
@@ -717,7 +727,7 @@ Deno.serve(async (req) => {
         const extracted = extractImgResult(data);
         if (extracted.url) {
           await logUsage(supabase, {
-            userId: user_id, sessionId: session_id, serviceSlug: 'fal',
+            userId: authedUserId, sessionId: session_id, serviceSlug: 'fal',
             action: `이미지 생성 (${model})`, creditsDeducted: 0, userPlan: 'test', status: 'success',
             metadata: { model: falModel, ratio: normalizedRatio, source, has_nsfw: extracted.hasNsfw, image_to_image: useImageToImage },
           });
@@ -725,7 +735,7 @@ Deno.serve(async (req) => {
           let adWorkId: string | null = null;
           if (source === 'ai-ad') {
             adWorkId = await saveAdWork(supabase, {
-              userId: user_id, sessionId: session_id, templateId: template_id,
+              userId: authedUserId, sessionId: session_id, templateId: template_id,
               templateTitle: template_title, resultType: 'image', resultUrl: extracted.url,
               ratio: normalizedRatio, resolution: resolution as string,
               format: format as string, productName: product_name, productDesc: product_desc,
@@ -735,7 +745,7 @@ Deno.serve(async (req) => {
           await saveGalleryItem(supabase, {
             type: 'image', url: extracted.url, prompt: finalPrompt,
             model: modelDisplayName, ratio: normalizedRatio,
-            userId: user_id, sessionId: session_id, source: source ?? 'ai-create',
+            userId: authedUserId, sessionId: session_id, source: source ?? 'ai-create',
           });
 
           return respond({
@@ -753,7 +763,7 @@ Deno.serve(async (req) => {
 
         if (res.status === 422 && !errInfo.isRetryable) {
           await logUsage(supabase, {
-            userId: user_id, sessionId: session_id, serviceSlug: 'fal',
+            userId: authedUserId, sessionId: session_id, serviceSlug: 'fal',
             action: `이미지 생성 실패 (${model}) - validation`, creditsDeducted: 0, userPlan: 'test',
             status: 'failed', metadata: { error: errInfo.message, model: falModel, error_type: errInfo.errorType },
           });
@@ -792,7 +802,7 @@ Deno.serve(async (req) => {
       const errInfo = parseFalErrorBody(errBody, retryableH, getFalErrorTypeHeader(queueRes));
 
       await logUsage(supabase, {
-        userId: user_id, sessionId: session_id, serviceSlug: 'fal',
+        userId: authedUserId, sessionId: session_id, serviceSlug: 'fal',
         action: `이미지 생성 실패 (${model}) - queue submit`, creditsDeducted: 0, userPlan: 'test',
         status: 'failed', metadata: { error: errInfo.message, model: falModel, http_status: queueRes.status },
       });
@@ -809,7 +819,7 @@ Deno.serve(async (req) => {
       console.log(`[generate-image] Queue 즉시 완료: ${immediateExtracted.url.slice(0, 80)}`);
 
       await logUsage(supabase, {
-        userId: user_id, sessionId: session_id, serviceSlug: 'fal',
+        userId: authedUserId, sessionId: session_id, serviceSlug: 'fal',
         action: `이미지 생성 (${model})`, creditsDeducted: 0, userPlan: 'test', status: 'success',
         metadata: { model: falModel, ratio: normalizedRatio, source, immediate: true, image_to_image: useImageToImage },
       });
@@ -817,7 +827,7 @@ Deno.serve(async (req) => {
       let adWorkId: string | null = null;
       if (source === 'ai-ad') {
         adWorkId = await saveAdWork(supabase, {
-          userId: user_id, sessionId: session_id, templateId: template_id,
+          userId: authedUserId, sessionId: session_id, templateId: template_id,
           templateTitle: template_title, resultType: 'image', resultUrl: immediateExtracted.url,
           ratio: normalizedRatio, resolution: resolution as string, format: format as string,
           productName: product_name, productDesc: product_desc,
@@ -826,7 +836,7 @@ Deno.serve(async (req) => {
       await saveGalleryItem(supabase, {
         type: 'image', url: immediateExtracted.url, prompt: finalPrompt,
         model: modelDisplayName, ratio: normalizedRatio,
-        userId: user_id, sessionId: session_id, source: source ?? 'ai-create',
+        userId: authedUserId, sessionId: session_id, source: source ?? 'ai-create',
       });
 
       return respond({
@@ -851,7 +861,7 @@ Deno.serve(async (req) => {
     console.log(`[generate-image] pending — request_id=${requestId}, status_url=${builtStatusUrl}`);
 
     await logUsage(supabase, {
-      userId: user_id, sessionId: session_id, serviceSlug: 'fal',
+      userId: authedUserId, sessionId: session_id, serviceSlug: 'fal',
       action: `이미지 생성 대기 (${model})`, creditsDeducted: 0, userPlan: 'test', status: 'success',
       metadata: {
         model: falModel, request_id: requestId, pending: true,
@@ -869,7 +879,7 @@ Deno.serve(async (req) => {
       credits_used: 0,
       image_to_image: useImageToImage,
       save_opts: {
-        user_id, session_id, prompt: finalPrompt,
+        user_id: authedUserId, session_id, prompt: finalPrompt,
         model: modelDisplayName, ratio: normalizedRatio,
         source, template_id, template_title,
         resolution, format, product_name, product_desc,

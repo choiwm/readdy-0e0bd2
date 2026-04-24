@@ -1,7 +1,6 @@
 import { useState, useRef, useEffect, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import AppNavbar from '@/components/feature/AppNavbar';
-import PageHeader from '@/components/feature/PageHeader';
 import ExportModal from './components/ExportModal';
 import SidebarContent from './components/SidebarContent';
 import ConfirmModal from '@/components/base/ConfirmModal';
@@ -11,20 +10,25 @@ import SfxPickerModal from '@/components/feature/SfxPickerModal';
 import { useSfxStore, useSfxStoreListener, SfxItem } from '@/hooks/useSfxStore';
 import { useCredits as useGlobalCredits } from '@/hooks/useCredits';
 import { useAuth } from '@/hooks/useAuth';
+import { SUPABASE_URL } from '@/lib/env';
+import UnsavedChangesModal from './components/UnsavedChangesModal';
+import CutCountConfirmModal from './components/CutCountConfirmModal';
+import RefSlot from './components/RefSlot';
+import ShotDetailPanel from './components/ShotDetailPanel';
+import ShotCardItem from './components/ShotCardItem';
+import AIScenarioModal from './components/AIScenarioModal';
+import GenerateAllModal from './components/GenerateAllModal';
+import type { ReferenceSlot, ShotCard, Project } from './types';
+import { SHOT_TYPES, CREDITS_PER_CUT } from './types';
 
 import {
   DndContext, closestCenter, PointerSensor, TouchSensor, KeyboardSensor,
   useSensor, useSensors, DragEndEvent, DragStartEvent, DragOverlay, DragMoveEvent,
 } from '@dnd-kit/core';
 import {
-  SortableContext, useSortable, rectSortingStrategy, arrayMove,
+  SortableContext, rectSortingStrategy, arrayMove,
   sortableKeyboardCoordinates,
 } from '@dnd-kit/sortable';
-import { CSS } from '@dnd-kit/utilities';
-
-interface ReferenceSlot { id: string; label: string; icon: string; imageUrl: string | null; }
-interface ShotCard { id: string; index: number; imageUrl: string | null; prompt: string; shotType: string; isGenerating: boolean; progress: number; error: string | null; }
-interface Project { id: string; title: string; aspectRatio: string; model: string; resolution: string; outputMode: 'image' | 'video'; shots: ShotCard[]; refSlots: ReferenceSlot[]; }
 
 const ASPECT_RATIOS = ['16:9', '9:16', '1:1', '4:3', '21:9'];
 const CUT_COUNTS = [1, 2, 3, 4, 5, 6, 8, 10, 12, 15, 20];
@@ -45,8 +49,6 @@ const MODELS: ModelOption[] = [
 ];
 
 const RESOLUTIONS = ['1K', '2K', '4K'];
-const SHOT_TYPES = ['Wide Shot', 'Medium Shot', 'Close Up', 'Over Shoulder', 'Two Shot', 'POV', 'Aerial', 'Tracking'];
-const CREDITS_PER_CUT = 3;
 
 function createEmptyShot(index: number): ShotCard {
   return { id: `shot-${Date.now()}-${index}-${Math.random().toString(36).slice(2, 7)}`, index, imageUrl: null, prompt: '', shotType: 'Wide Shot', isGenerating: false, progress: 0, error: null };
@@ -84,316 +86,6 @@ const defaultRefSlots: ReferenceSlot[] = [
   { id: 'bg1', label: '배경', icon: 'ri-map-pin-line', imageUrl: null },
 ];
 
-// 로컬 useCredits 제거 — 전역 useGlobalCredits 사용
-
-function UnsavedChangesModal({ projectTitle, onSave, onDiscard, onCancel, isSaving }: { projectTitle: string; onSave: () => void; onDiscard: () => void; onCancel: () => void; isSaving: boolean; }) {
-  useEffect(() => { const h = (e: KeyboardEvent) => { if (e.key === 'Escape') onCancel(); }; window.addEventListener('keydown', h); return () => window.removeEventListener('keydown', h); }, [onCancel]);
-  return (
-    <div className="fixed inset-0 z-[60] flex items-center justify-center bg-black/80 backdrop-blur-sm p-4" onClick={onCancel}>
-      <div className="w-full max-w-sm bg-[#111113] border border-white/10 rounded-2xl overflow-hidden" onClick={(e) => e.stopPropagation()}>
-        <div className="p-5">
-          <div className="flex items-center gap-3 mb-4">
-            <div className="w-10 h-10 rounded-xl flex items-center justify-center bg-amber-500/10 border border-amber-500/20 flex-shrink-0"><i className="ri-save-3-line text-amber-400 text-lg" /></div>
-            <div><p className="text-sm font-bold text-white">미저장 변경사항</p><p className="text-[11px] text-zinc-500 truncate max-w-[180px]">{projectTitle}</p></div>
-          </div>
-          <p className="text-sm text-zinc-300 leading-relaxed mb-5">이 프로젝트에 저장되지 않은 변경사항이 있습니다.<br /><span className="text-amber-400 font-bold">다른 프로젝트로 이동하기 전에 저장하시겠습니까?</span></p>
-          <div className="flex flex-col gap-2">
-            <button onClick={onSave} disabled={isSaving} className="w-full py-2.5 bg-indigo-600 hover:bg-indigo-500 disabled:opacity-50 disabled:cursor-not-allowed text-white font-bold text-sm rounded-xl transition-all cursor-pointer flex items-center justify-center gap-2 whitespace-nowrap">
-              {isSaving ? <><div className="w-3.5 h-3.5 border-2 border-white/30 border-t-white rounded-full animate-spin" /> 저장 중...</> : <><i className="ri-save-line text-sm" /> 저장하고 이동</>}
-            </button>
-            <button onClick={onDiscard} className="w-full py-2.5 bg-zinc-800 hover:bg-zinc-700 border border-white/5 text-zinc-300 font-bold text-sm rounded-xl transition-all cursor-pointer whitespace-nowrap">버리고 이동</button>
-            <button onClick={onCancel} className="w-full py-2 text-zinc-600 hover:text-zinc-400 text-sm font-medium transition-colors cursor-pointer whitespace-nowrap">취소</button>
-          </div>
-        </div>
-      </div>
-    </div>
-  );
-}
-
-function CutCountConfirmModal({ currentCount, newCount, onConfirm, onCancel }: { currentCount: number; newCount: number; onConfirm: () => void; onCancel: () => void; }) {
-  const isReducing = newCount < currentCount;
-  return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-sm p-4" onClick={onCancel}>
-      <div className="w-full max-w-sm bg-[#111113] border border-white/10 rounded-2xl overflow-hidden" onClick={(e) => e.stopPropagation()}>
-        <div className="p-5">
-          <div className="flex items-center gap-3 mb-4">
-            <div className={`w-10 h-10 rounded-xl flex items-center justify-center ${isReducing ? 'bg-amber-500/10 border border-amber-500/20' : 'bg-indigo-500/10 border border-indigo-500/20'}`}>
-              <i className={`${isReducing ? 'ri-error-warning-line text-amber-400' : 'ri-film-line text-indigo-400'} text-lg`} />
-            </div>
-            <div><p className="text-sm font-bold text-white">컷 수 변경</p><p className="text-[11px] text-zinc-500">{currentCount}컷 → {newCount}컷</p></div>
-          </div>
-          {isReducing ? <p className="text-sm text-zinc-300 leading-relaxed mb-5">컷 수를 줄이면 <strong className="text-amber-400">뒤쪽 {currentCount - newCount}개 컷이 삭제</strong>됩니다. 계속하시겠습니까?</p>
-            : <p className="text-sm text-zinc-300 leading-relaxed mb-5"><strong className="text-indigo-400">{newCount - currentCount}개의 빈 컷</strong>이 추가됩니다.</p>}
-          <div className="flex gap-2">
-            <button onClick={onCancel} className="flex-1 py-2.5 bg-zinc-800 hover:bg-zinc-700 border border-white/5 text-zinc-300 font-bold text-sm rounded-xl transition-all cursor-pointer whitespace-nowrap">취소</button>
-            <button onClick={onConfirm} className={`flex-1 py-2.5 font-bold text-sm rounded-xl transition-all cursor-pointer text-white ${isReducing ? 'bg-amber-500 hover:bg-amber-400' : 'bg-indigo-500 hover:bg-indigo-400'}`}>{isReducing ? '삭제하고 변경' : '컷 추가'}</button>
-          </div>
-        </div>
-      </div>
-    </div>
-  );
-}
-
-function RefSlot({ slot, onUpload }: { slot: ReferenceSlot; onUpload: (id: string, url: string) => void }) {
-  const inputRef = useRef<HTMLInputElement>(null);
-  return (
-    <div onClick={() => inputRef.current?.click()} className="flex-shrink-0 w-[80px] h-[80px] rounded-xl border border-zinc-700/50 bg-zinc-900/60 hover:border-indigo-500/40 hover:bg-zinc-900 transition-all cursor-pointer overflow-hidden relative group">
-      <input ref={inputRef} type="file" accept="image/*" className="hidden" onChange={(e) => { const f = e.target.files?.[0]; if (f) onUpload(slot.id, URL.createObjectURL(f)); }} />
-      {slot.imageUrl ? (
-        <><img src={slot.imageUrl} alt={slot.label} className="w-full h-full object-cover" /><div className="absolute inset-0 bg-black/50 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center"><i className="ri-edit-line text-white text-sm" /></div></>
-      ) : (
-        <div className="w-full h-full flex flex-col items-center justify-center gap-1.5"><i className={`${slot.icon} text-zinc-600 text-xl group-hover:text-indigo-400 transition-colors`} /><span className="text-[10px] text-zinc-500 font-medium text-center leading-tight px-1">{slot.label}</span></div>
-      )}
-    </div>
-  );
-}
-
-interface ShotDetailPanelProps {
-  shot: ShotCard; isPortrait: boolean; isSquare: boolean;
-  onClose: () => void; onPromptChange: (id: string, p: string) => void;
-  onShotTypeChange: (id: string, t: string) => void; onGenerate: (id: string) => void;
-  onDownload: (shot: ShotCard) => void;
-}
-function ShotDetailPanel({ shot, isPortrait, isSquare, onClose, onPromptChange, onShotTypeChange, onGenerate, onDownload }: ShotDetailPanelProps) {
-  const aspectClass = isPortrait ? 'aspect-[9/16]' : isSquare ? 'aspect-square' : 'aspect-video';
-  useEffect(() => { const h = (e: KeyboardEvent) => { if (e.key === 'Escape') onClose(); }; window.addEventListener('keydown', h); return () => window.removeEventListener('keydown', h); }, [onClose]);
-  return (
-    <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-black/80 backdrop-blur-sm sm:p-4" onClick={onClose}>
-      <div className="w-full sm:max-w-2xl bg-[#111113] border border-white/10 sm:rounded-2xl rounded-t-2xl overflow-hidden flex flex-col max-h-[95vh] sm:max-h-[90vh]" onClick={(e) => e.stopPropagation()}>
-        <div className="flex items-center justify-between px-4 sm:px-5 py-3 sm:py-3.5 border-b border-white/5 flex-shrink-0">
-          <div className="flex items-center gap-3">
-            <span className="text-xs font-black bg-indigo-500/20 text-indigo-400 px-2.5 py-1 rounded-full">#{shot.index}</span>
-            <span className="text-sm font-bold text-white">컷 편집</span>
-          </div>
-          <div className="flex items-center gap-2">
-            {shot.imageUrl && <button onClick={() => onDownload(shot)} className="flex items-center gap-1.5 text-xs font-bold text-zinc-400 hover:text-white bg-zinc-800/60 hover:bg-zinc-700 border border-white/5 px-2.5 py-1.5 rounded-lg transition-all cursor-pointer whitespace-nowrap"><i className="ri-download-2-line text-xs" /><span className="hidden sm:inline">다운로드</span></button>}
-            <button onClick={onClose} className="w-7 h-7 flex items-center justify-center rounded-lg text-zinc-500 hover:text-white hover:bg-white/5 transition-all cursor-pointer"><i className="ri-close-line" /></button>
-          </div>
-        </div>
-        <div className="flex flex-col sm:flex-row overflow-y-auto">
-          <div className={`relative bg-zinc-950 flex items-center justify-center flex-shrink-0 ${isPortrait ? 'w-full sm:w-48' : 'w-full sm:w-72'}`}>
-            <div className={`${aspectClass} w-full`}>
-              {shot.imageUrl ? <img src={shot.imageUrl} alt={`Shot ${shot.index}`} className="w-full h-full object-cover" />
-                : shot.isGenerating ? (
-                  <div className="absolute inset-0 flex flex-col items-center justify-center gap-3 bg-zinc-950">
-                    <div className="w-10 h-10 border-2 border-indigo-400/30 border-t-indigo-400 rounded-full animate-spin" />
-                    <div className="w-32 h-1.5 bg-zinc-800 rounded-full overflow-hidden"><div className="h-full bg-gradient-to-r from-indigo-500 to-violet-500 rounded-full transition-all duration-300" style={{ width: `${shot.progress}%` }} /></div>
-                    <span className="text-xs text-zinc-400 font-bold">{shot.progress}%</span>
-                  </div>
-                ) : <div className="absolute inset-0 flex flex-col items-center justify-center gap-2 bg-zinc-950"><i className="ri-image-line text-zinc-700 text-3xl" /><span className="text-xs text-zinc-600">이미지 없음</span></div>}
-            </div>
-          </div>
-          <div className="flex-1 p-4 sm:p-5 flex flex-col gap-3 sm:gap-4">
-            <div>
-              <label className="text-[11px] font-black text-zinc-500 uppercase tracking-wider mb-2 block">샷 타입</label>
-              <div className="flex flex-wrap gap-1.5">
-                {SHOT_TYPES.map((t) => (
-                  <button key={t} onClick={() => onShotTypeChange(shot.id, t)} className={`px-2.5 py-1.5 rounded-lg text-[11px] font-bold transition-all cursor-pointer whitespace-nowrap ${shot.shotType === t ? 'bg-indigo-500/20 border border-indigo-500/30 text-indigo-400' : 'bg-zinc-800/60 border border-white/5 text-zinc-500 hover:text-white hover:border-white/10'}`}>{t}</button>
-                ))}
-              </div>
-            </div>
-            <div className="flex-1">
-              <label className="text-[11px] font-black text-zinc-500 uppercase tracking-wider mb-2 block">프롬프트</label>
-              <textarea value={shot.prompt} onChange={(e) => onPromptChange(shot.id, e.target.value)} placeholder="장면을 묘사하세요..." className="w-full bg-zinc-900/60 border border-white/5 rounded-xl px-4 py-3 text-sm text-zinc-300 placeholder-zinc-600 resize-none outline-none focus:border-indigo-500/30 transition-colors min-h-[80px] sm:min-h-[100px] leading-relaxed" />
-            </div>
-            {shot.error && <div className="flex items-center gap-2 px-3 py-2 bg-red-500/10 border border-red-500/20 rounded-xl"><i className="ri-error-warning-line text-red-400 text-sm flex-shrink-0" /><span className="text-xs text-red-400">{shot.error}</span></div>}
-            <div className="flex gap-2">
-              {shot.imageUrl && <button onClick={() => onDownload(shot)} className="flex items-center justify-center py-3 px-4 bg-zinc-800 hover:bg-zinc-700 border border-white/5 text-zinc-300 font-bold text-sm rounded-xl transition-all cursor-pointer"><i className="ri-download-2-line" /></button>}
-              <button onClick={() => { onGenerate(shot.id); onClose(); }} disabled={shot.isGenerating} className="flex-1 py-3 bg-gradient-to-r from-indigo-500 to-violet-500 hover:from-indigo-400 hover:to-violet-400 disabled:opacity-40 disabled:cursor-not-allowed text-white font-bold text-sm rounded-xl transition-all cursor-pointer flex items-center justify-center gap-2">
-                {shot.isGenerating ? <><div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />생성 중...</>
-                  : shot.imageUrl ? <><i className="ri-refresh-line" /> 재생성 <span className="text-[11px] bg-white/20 px-1.5 py-0.5 rounded-md font-black"><i className="ri-copper-diamond-line text-[10px]" /> {CREDITS_PER_CUT}</span></>
-                  : <><i className="ri-sparkling-2-line" /> 이미지 생성 <span className="text-[11px] bg-white/20 px-1.5 py-0.5 rounded-md font-black"><i className="ri-copper-diamond-line text-[10px]" /> {CREDITS_PER_CUT}</span></>}
-              </button>
-            </div>
-          </div>
-        </div>
-      </div>
-    </div>
-  );
-}
-
-interface ShotCardItemProps {
-  shot: ShotCard; isPortrait: boolean; isSquare: boolean;
-  onPromptChange: (id: string, p: string) => void; onShotTypeChange: (id: string, t: string) => void;
-  onGenerate: (id: string) => void; onDelete: (id: string) => void; onDuplicate: (id: string) => void;
-  onOpenDetail: (id: string) => void; onDownload: (shot: ShotCard) => void; isDragging?: boolean;
-  dragOverIndex?: number | null;
-}
-function ShotCardItem({ shot, isPortrait, isSquare, onPromptChange, onShotTypeChange, onGenerate, onDelete, onDuplicate, onOpenDetail, onDownload, isDragging = false }: ShotCardItemProps) {
-  const [showTypeDropdown, setShowTypeDropdown] = useState(false);
-  const aspectClass = isPortrait ? 'aspect-[9/16]' : isSquare ? 'aspect-square' : 'aspect-video';
-  const { attributes, listeners, setNodeRef, transform, transition, isDragging: isSortableDragging, isOver } = useSortable({ id: shot.id });
-  const style = { transform: CSS.Transform.toString(transform), transition: transition ?? 'transform 200ms cubic-bezier(0.25, 1, 0.5, 1)', opacity: isSortableDragging ? 0 : 1, zIndex: isSortableDragging ? 50 : undefined };
-  const stopGen = (e: React.MouseEvent) => { e.stopPropagation(); onGenerate(shot.id); };
-  const stopDl = (e: React.MouseEvent) => { e.stopPropagation(); onDownload(shot); };
-
-  return (
-    <div ref={setNodeRef} style={style} className={`bg-[#1a1a1e] border rounded-xl overflow-visible group flex flex-col relative ${isSortableDragging ? 'border-indigo-500/40' : isOver ? 'border-indigo-400/60 ring-2 ring-indigo-400/20 bg-indigo-500/5' : isDragging ? 'border-indigo-500/50 ring-2 ring-indigo-500/30' : 'border-zinc-700/40 hover:border-zinc-600/60'} transition-colors duration-150`}>
-      {isOver && !isSortableDragging && <div className="absolute -top-0.5 left-0 right-0 h-0.5 bg-indigo-400 rounded-full z-10" />}
-      <div className="flex items-center justify-between px-2 py-1.5 border-b border-zinc-700/30 flex-shrink-0">
-        <div className="flex items-center gap-1">
-          <div {...attributes} {...listeners} className="w-6 h-6 flex items-center justify-center rounded-md text-zinc-600 hover:text-indigo-400 hover:bg-indigo-500/10 transition-all cursor-grab active:cursor-grabbing touch-none select-none"><i className="ri-draggable text-sm" /></div>
-          <span className="text-[10px] font-black text-zinc-500">#{shot.index}</span>
-        </div>
-        <div className="flex items-center gap-0.5">
-          {shot.imageUrl && (
-            <button onClick={stopDl} className="w-6 h-6 flex items-center justify-center rounded-md text-zinc-500 hover:text-indigo-400 hover:bg-indigo-500/10 transition-all cursor-pointer opacity-0 group-hover:opacity-100 sm:opacity-0 sm:group-hover:opacity-100">
-              <i className="ri-download-2-line text-[10px]" />
-            </button>
-          )}
-          <div className="relative">
-            <button onClick={(e) => { e.stopPropagation(); setShowTypeDropdown(!showTypeDropdown); }} className="flex items-center gap-0.5 text-[9px] text-zinc-500 hover:text-white bg-zinc-800/60 px-1 py-0.5 rounded-md transition-all cursor-pointer whitespace-nowrap border border-zinc-700/40 hover:border-zinc-600/60 max-w-[60px] sm:max-w-none">
-              <i className="ri-camera-line text-[8px]" />
-              <span className="truncate hidden sm:inline">{shot.shotType}</span>
-              <i className="ri-arrow-down-s-line text-[8px]" />
-            </button>
-            {showTypeDropdown && (
-              <div className="absolute top-full right-0 mt-1 w-36 bg-zinc-900 border border-white/10 rounded-xl overflow-hidden z-50 shadow-2xl" onClick={(e) => e.stopPropagation()}>
-                {SHOT_TYPES.map((t) => (
-                  <button key={t} onClick={() => { onShotTypeChange(shot.id, t); setShowTypeDropdown(false); }} className={`w-full text-left px-3 py-2 text-[11px] transition-colors cursor-pointer flex items-center justify-between ${shot.shotType === t ? 'text-indigo-400 bg-indigo-500/10' : 'text-zinc-300 hover:bg-white/5 hover:text-white'}`}>
-                    {t}{shot.shotType === t && <i className="ri-check-line text-indigo-400 text-[9px]" />}
-                  </button>
-                ))}
-              </div>
-            )}
-          </div>
-          <div className="flex items-center gap-0.5">
-            <button onClick={(e) => { e.stopPropagation(); onDuplicate(shot.id); }} className="w-6 h-6 flex items-center justify-center rounded-md text-zinc-600 hover:text-emerald-400 hover:bg-emerald-500/10 transition-all cursor-pointer opacity-0 group-hover:opacity-100"><i className="ri-file-copy-line text-[10px]" /></button>
-            <button onClick={(e) => { e.stopPropagation(); onDelete(shot.id); }} className="w-6 h-6 flex items-center justify-center rounded-md text-zinc-600 hover:text-red-400 hover:bg-red-500/10 transition-all cursor-pointer opacity-0 group-hover:opacity-100"><i className="ri-close-line text-[10px]" /></button>
-          </div>
-        </div>
-      </div>
-      <div className={`relative ${aspectClass} bg-zinc-950 overflow-hidden cursor-pointer flex-shrink-0`} onClick={() => onOpenDetail(shot.id)}>
-        {shot.imageUrl ? (
-          <>
-            <img src={shot.imageUrl} alt={`Shot ${shot.index}`} className="w-full h-full object-cover" />
-            <div className="absolute inset-0 bg-black/50 opacity-0 group-hover:opacity-100 transition-opacity flex flex-col items-center justify-center gap-1.5 sm:gap-2">
-              <button onClick={stopGen} className="flex items-center gap-1.5 bg-zinc-800/90 backdrop-blur-sm border border-zinc-600/60 text-white text-[11px] font-bold px-2.5 sm:px-3 py-1.5 rounded-lg cursor-pointer hover:bg-zinc-700/90 transition-all"><i className="ri-refresh-line text-xs" /> 재생성</button>
-              <button onClick={(e) => { e.stopPropagation(); onOpenDetail(shot.id); }} className="flex items-center gap-1.5 bg-zinc-800/90 backdrop-blur-sm border border-zinc-600/60 text-white text-[11px] font-bold px-2.5 sm:px-3 py-1.5 rounded-lg cursor-pointer hover:bg-zinc-700/90 transition-all"><i className="ri-edit-line text-xs" /> 편집</button>
-              <button onClick={(e) => { e.stopPropagation(); onDuplicate(shot.id); }} className="flex items-center gap-1.5 bg-zinc-800/90 backdrop-blur-sm border border-zinc-600/60 text-white text-[11px] font-bold px-2.5 sm:px-3 py-1.5 rounded-lg cursor-pointer hover:bg-emerald-500/20 hover:border-emerald-500/40 transition-all"><i className="ri-file-copy-line text-xs" /> 복제</button>
-              <button onClick={stopDl} className="flex items-center gap-1.5 bg-zinc-800/90 backdrop-blur-sm border border-zinc-600/60 text-white text-[11px] font-bold px-2.5 sm:px-3 py-1.5 rounded-lg cursor-pointer hover:bg-zinc-700/90 transition-all"><i className="ri-download-2-line text-xs" /> 다운로드</button>
-            </div>
-          </>
-        ) : shot.isGenerating ? (
-          <div className="absolute inset-0 flex flex-col items-center justify-center gap-2.5 bg-zinc-950">
-            <div className="relative w-10 h-10"><div className="absolute inset-0 border-2 border-indigo-500/20 rounded-full" /><div className="absolute inset-0 border-2 border-transparent border-t-indigo-400 rounded-full animate-spin" /><div className="absolute inset-0 flex items-center justify-center"><i className="ri-sparkling-2-line text-indigo-400 text-xs" /></div></div>
-            <div className="w-20 h-1 bg-zinc-800 rounded-full overflow-hidden"><div className="h-full bg-gradient-to-r from-indigo-500 to-violet-500 rounded-full transition-all duration-200" style={{ width: `${shot.progress}%` }} /></div>
-            <span className="text-[10px] text-zinc-500 font-mono">{shot.progress}%</span>
-          </div>
-        ) : shot.error ? (
-          <div className="absolute inset-0 flex flex-col items-center justify-center gap-2 bg-zinc-950 p-3">
-            <i className="ri-error-warning-line text-red-400 text-xl" /><span className="text-[10px] text-red-400 text-center leading-tight">{shot.error}</span>
-            <button onClick={stopGen} className="text-[10px] text-indigo-400 hover:text-indigo-300 cursor-pointer mt-1">다시 시도</button>
-          </div>
-        ) : (
-          <div className="absolute inset-0 flex flex-col items-center justify-center gap-2 bg-zinc-950 group/empty">
-            <div className="w-9 h-9 rounded-xl bg-zinc-800/80 border border-zinc-700/40 flex items-center justify-center group-hover/empty:bg-indigo-500/10 group-hover/empty:border-indigo-500/20 transition-all"><i className="ri-image-line text-zinc-600 group-hover/empty:text-indigo-400 text-base transition-colors" /></div>
-            <span className="text-[10px] text-zinc-600 group-hover/empty:text-zinc-400 transition-colors">이미지 생성 대기</span>
-            <button onClick={stopGen} className="opacity-0 group-hover/empty:opacity-100 flex items-center gap-1 text-[10px] text-indigo-400 font-bold bg-indigo-500/10 border border-indigo-500/20 px-2.5 py-1 rounded-lg cursor-pointer transition-all hover:bg-indigo-500/20"><i className="ri-sparkling-2-line text-[9px]" /> 생성</button>
-          </div>
-        )}
-        {shot.imageUrl && !shot.isGenerating && <div className="absolute top-1.5 left-1.5"><span className="text-[9px] font-black bg-emerald-500/20 text-emerald-400 border border-emerald-500/20 px-1.5 py-0.5 rounded-full backdrop-blur-sm">완료</span></div>}
-      </div>
-      <div className="px-2 pt-1.5 pb-1.5 flex-1 flex flex-col gap-1">
-        <textarea value={shot.prompt} onChange={(e) => onPromptChange(shot.id, e.target.value)} placeholder="프롬프트를 입력하세요..." className="w-full bg-transparent text-[11px] text-zinc-400 placeholder-zinc-700 resize-none outline-none leading-relaxed min-h-[32px] max-h-[52px]" rows={2} onClick={(e) => e.stopPropagation()} />
-        <div className="flex items-center justify-between">
-          <span className="text-[9px] text-zinc-700">{shot.prompt.length > 0 ? `${shot.prompt.length}자` : ''}</span>
-          <button onClick={stopGen} disabled={shot.isGenerating} className={`flex items-center gap-1 text-[10px] font-bold px-2 py-1 rounded-lg transition-all cursor-pointer whitespace-nowrap disabled:opacity-40 disabled:cursor-not-allowed ${shot.imageUrl ? 'text-zinc-500 hover:text-white hover:bg-zinc-800/60' : 'text-indigo-400 hover:bg-indigo-500/10 bg-indigo-500/5 border border-indigo-500/20'}`}>
-            {shot.isGenerating ? <div className="w-2.5 h-2.5 border border-indigo-400/30 border-t-indigo-400 rounded-full animate-spin" /> : <i className={`${shot.imageUrl ? 'ri-refresh-line' : 'ri-sparkling-2-line'} text-[10px]`} />}
-            {shot.isGenerating ? '생성 중' : shot.imageUrl ? '재생성' : '생성'}
-          </button>
-        </div>
-      </div>
-    </div>
-  );
-}
-
-function AIScenarioModal({ onClose, onGenerate }: { onClose: () => void; onGenerate: (s: string, c: number) => void }) {
-  const [scenario, setScenario] = useState(''); const [count, setCount] = useState(4); const [autoGen, setAutoGen] = useState(true);
-  const examples = ['새벽 카페에서 바리스타가 첫 손님을 맞이하며 하루를 시작하는 이야기. 따뜻한 조명과 커피 향이 가득한 공간.', '우주 탐험가가 미지의 행성에 착륙해 외계 생명체와 조우하는 장면.', '도시의 옥상에서 두 연인이 마지막 작별을 고하는 감성적인 씬.'];
-  return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-sm p-4" onClick={onClose}>
-      <div className="w-full max-w-lg bg-[#111113] border border-white/10 rounded-2xl overflow-hidden" onClick={(e) => e.stopPropagation()}>
-        <div className="flex items-center justify-between px-5 py-4 border-b border-white/5">
-          <div className="flex items-center gap-2"><i className="ri-sparkling-2-line text-indigo-400" /><span className="text-sm font-bold text-white">AI 시나리오 추가</span></div>
-          <button onClick={onClose} className="w-7 h-7 flex items-center justify-center rounded-lg text-zinc-500 hover:text-white hover:bg-white/5 transition-all cursor-pointer"><i className="ri-close-line" /></button>
-        </div>
-        <div className="p-5 space-y-4">
-          <div><label className="text-[11px] font-black text-zinc-500 uppercase tracking-wider mb-2 block">시나리오</label><textarea value={scenario} onChange={(e) => setScenario(e.target.value)} placeholder="영상의 스토리, 장면 흐름을 자연스럽게 입력하세요..." className="w-full bg-zinc-900/60 border border-white/5 rounded-xl px-4 py-3 text-sm text-zinc-300 placeholder-zinc-600 resize-none outline-none focus:border-indigo-500/30 transition-colors min-h-[90px] leading-relaxed" /></div>
-          <div><label className="text-[11px] font-black text-zinc-500 uppercase tracking-wider mb-2 block">예시 시나리오</label><div className="space-y-1.5">{examples.map((ex, i) => <button key={i} onClick={() => setScenario(ex)} className="w-full text-left text-[11px] text-zinc-400 hover:text-white bg-zinc-900/40 hover:bg-zinc-900 border border-white/5 hover:border-indigo-500/20 rounded-xl px-3 py-2.5 transition-all cursor-pointer leading-relaxed">{ex}</button>)}</div></div>
-          <div className="grid grid-cols-2 gap-3">
-            <div><label className="text-[11px] font-black text-zinc-500 uppercase tracking-wider mb-2 block">생성할 컷 수</label><div className="flex gap-1.5">{[2, 4, 6, 8].map((n) => <button key={n} onClick={() => setCount(n)} className={`flex-1 py-2 rounded-xl text-xs font-bold transition-all cursor-pointer ${count === n ? 'bg-indigo-500/20 border border-indigo-500/30 text-indigo-400' : 'bg-zinc-800/60 border border-white/5 text-zinc-400 hover:text-white'}`}>{n}</button>)}</div></div>
-            <div><label className="text-[11px] font-black text-zinc-500 uppercase tracking-wider mb-2 block">자동 이미지 생성</label><button onClick={() => setAutoGen(!autoGen)} className={`w-full py-2 rounded-xl text-xs font-bold transition-all cursor-pointer border ${autoGen ? 'bg-indigo-500/20 border-indigo-500/30 text-indigo-400' : 'bg-zinc-800/60 border-white/5 text-zinc-400'}`}>{autoGen ? '켜짐 — 바로 생성' : '꺼짐 — 나중에 생성'}</button></div>
-          </div>
-        </div>
-        <div className="px-5 pb-5"><button onClick={() => { if (scenario.trim()) { onGenerate(scenario, count); onClose(); } }} disabled={!scenario.trim()} className="w-full py-3 bg-gradient-to-r from-indigo-500 to-violet-500 hover:from-indigo-400 hover:to-violet-400 disabled:opacity-40 disabled:cursor-not-allowed text-white font-bold text-sm rounded-xl transition-all cursor-pointer flex items-center justify-center gap-2"><i className="ri-sparkling-2-line" />{autoGen ? `${count}컷 생성 + 이미지 자동 생성` : `${count}컷 추가`}</button></div>
-      </div>
-    </div>
-  );
-}
-
-interface GenerateAllModalProps { shots: ShotCard[]; totalCount: number; onCancel: () => void; onClose: () => void; }
-function GenerateAllModal({ shots, totalCount, onCancel, onClose }: GenerateAllModalProps) {
-  const completed = shots.filter((s) => s.imageUrl && !s.isGenerating).length;
-  const generating = shots.filter((s) => s.isGenerating).length;
-  const failed = shots.filter((s) => s.error).length;
-  const pending = shots.filter((s) => !s.imageUrl && !s.isGenerating && !s.error).length;
-  const overallProgress = totalCount > 0 ? Math.round((completed / totalCount) * 100) : 0;
-  const isDone = completed + failed >= totalCount;
-
-  useEffect(() => { if (isDone) { const t = setTimeout(onClose, 1800); return () => clearTimeout(t); } return undefined; }, [isDone, onClose]);
-  useEffect(() => { const h = (e: KeyboardEvent) => { if (e.key === 'Escape' && !isDone) onCancel(); }; window.addEventListener('keydown', h); return () => window.removeEventListener('keydown', h); }, [onCancel, isDone]);
-
-  return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/75 backdrop-blur-sm p-4">
-      <div className="w-full max-w-lg bg-[#111113] border border-white/10 rounded-2xl overflow-hidden flex flex-col">
-        <div className="flex items-center justify-between px-5 py-4 border-b border-white/5">
-          <div className="flex items-center gap-3">
-            <div className={`w-8 h-8 flex items-center justify-center rounded-xl border transition-all ${isDone ? 'bg-emerald-500/10 border-emerald-500/20' : 'bg-indigo-500/10 border-indigo-500/20'}`}>
-              {isDone ? <i className="ri-check-line text-emerald-400 text-sm" /> : <div className="w-4 h-4 border-2 border-indigo-400/30 border-t-indigo-400 rounded-full animate-spin" />}
-            </div>
-            <div><p className="text-sm font-bold text-white">{isDone ? '생성 완료!' : '전체 컷 생성 중...'}</p><p className="text-[11px] text-zinc-500">{isDone ? `${completed}개 완료${failed > 0 ? `, ${failed}개 실패` : ''}` : `${completed} / ${totalCount}개 완료`}</p></div>
-          </div>
-          {!isDone && <button onClick={onCancel} className="flex items-center gap-1.5 text-xs font-bold text-zinc-500 hover:text-red-400 bg-zinc-800/60 hover:bg-red-500/10 border border-white/5 hover:border-red-500/20 px-3 py-1.5 rounded-lg transition-all cursor-pointer whitespace-nowrap"><i className="ri-stop-circle-line text-xs" /> 취소</button>}
-        </div>
-        <div className="px-5 pt-4 pb-3">
-          <div className="flex items-center justify-between mb-2"><span className="text-[11px] font-black text-zinc-500 uppercase tracking-wider">전체 진행률</span><span className={`text-sm font-black ${isDone ? 'text-emerald-400' : 'text-indigo-400'}`}>{overallProgress}%</span></div>
-          <div className="w-full h-2.5 bg-zinc-800 rounded-full overflow-hidden"><div className={`h-full rounded-full transition-all duration-500 ${isDone ? 'bg-gradient-to-r from-emerald-500 to-teal-400' : 'bg-gradient-to-r from-indigo-500 to-violet-500'}`} style={{ width: `${overallProgress}%` }} /></div>
-          <div className="flex items-center gap-4 mt-3">
-            <div className="flex items-center gap-1.5"><div className="w-2 h-2 rounded-full bg-emerald-400" /><span className="text-[11px] text-zinc-400 font-bold">{completed} 완료</span></div>
-            {generating > 0 && <div className="flex items-center gap-1.5"><div className="w-2 h-2 rounded-full bg-indigo-400 animate-pulse" /><span className="text-[11px] text-zinc-400 font-bold">{generating} 생성 중</span></div>}
-            {pending > 0 && <div className="flex items-center gap-1.5"><div className="w-2 h-2 rounded-full bg-zinc-600" /><span className="text-[11px] text-zinc-400 font-bold">{pending} 대기</span></div>}
-            {failed > 0 && <div className="flex items-center gap-1.5"><div className="w-2 h-2 rounded-full bg-red-400" /><span className="text-[11px] text-red-400 font-bold">{failed} 실패</span></div>}
-          </div>
-        </div>
-        <div className="px-5 pb-4 max-h-[280px] overflow-y-auto space-y-1.5">
-          {shots.map((shot) => {
-            const isGen = shot.isGenerating; const isDone2 = !!shot.imageUrl && !isGen; const isErr = !!shot.error; const isPend = !isDone2 && !isGen && !isErr;
-            return (
-              <div key={shot.id} className={`flex items-center gap-3 px-3 py-2.5 rounded-xl border transition-all ${isDone2 ? 'bg-emerald-500/5 border-emerald-500/15' : isGen ? 'bg-indigo-500/8 border-indigo-500/20' : isErr ? 'bg-red-500/5 border-red-500/15' : 'bg-zinc-900/40 border-white/5'}`}>
-                <div className="w-10 h-6 rounded-md overflow-hidden flex-shrink-0 bg-zinc-800">
-                  {shot.imageUrl ? <img src={shot.imageUrl} alt="" className="w-full h-full object-cover" /> : <div className="w-full h-full flex items-center justify-center"><i className={`text-[10px] ${isGen ? 'ri-loader-4-line text-indigo-400 animate-spin' : isErr ? 'ri-error-warning-line text-red-400' : 'ri-image-line text-zinc-600'}`} /></div>}
-                </div>
-                <div className="flex-1 min-w-0">
-                  <div className="flex items-center gap-2"><span className="text-[11px] font-black text-zinc-400">#{shot.index}</span>{shot.prompt && <span className="text-[11px] text-zinc-600 truncate">{shot.prompt.slice(0, 30)}</span>}</div>
-                  {isGen && <div className="mt-1 w-full h-1 bg-zinc-800 rounded-full overflow-hidden"><div className="h-full bg-gradient-to-r from-indigo-500 to-violet-500 rounded-full transition-all duration-200" style={{ width: `${shot.progress}%` }} /></div>}
-                </div>
-                <div className="flex-shrink-0">
-                  {isDone2 && <span className="flex items-center gap-1 text-[10px] font-black text-emerald-400 bg-emerald-500/10 px-2 py-0.5 rounded-full"><i className="ri-check-line text-[9px]" /> 완료</span>}
-                  {isGen && <span className="flex items-center gap-1 text-[10px] font-black text-indigo-400 bg-indigo-500/10 px-2 py-0.5 rounded-full"><span className="font-mono">{shot.progress}%</span></span>}
-                  {isErr && <span className="flex items-center gap-1 text-[10px] font-black text-red-400 bg-red-500/10 px-2 py-0.5 rounded-full"><i className="ri-error-warning-line text-[9px]" /> 실패</span>}
-                  {isPend && <span className="text-[10px] font-bold text-zinc-600 bg-zinc-800/60 px-2 py-0.5 rounded-full">대기</span>}
-                </div>
-              </div>
-            );
-          })}
-        </div>
-        {isDone && <div className="px-5 pb-5"><div className="flex items-center justify-center gap-2 py-3 bg-emerald-500/10 border border-emerald-500/20 rounded-xl"><i className="ri-check-double-line text-emerald-400" /><span className="text-sm font-bold text-emerald-400">모두 완료! 잠시 후 자동으로 닫힙니다</span></div></div>}
-      </div>
-    </div>
-  );
-}
-
 export default function AIBoardPage() {
   const navigate = useNavigate();
   const { user } = useAuth();
@@ -401,7 +93,7 @@ export default function AIBoardPage() {
   const {
     projects,
     setProjects,
-    isLoading: isDbLoading,
+    isLoading: _isDbLoading,
     isSaving: isDbSaving,
     loadProjects,
     saveProject,
@@ -414,7 +106,7 @@ export default function AIBoardPage() {
   const [projectTitle, setProjectTitle] = useState('새벽 카페 씬');
   const [editingTitle, setEditingTitle] = useState(false);
   const [aspectRatio, setAspectRatio] = useState('16:9');
-  const [cutCount, setCutCount] = useState(4);
+  const [_cutCount, setCutCount] = useState(4);
   const [model, setModel] = useState('Flux Realism');
   const [resolution, setResolution] = useState('1K');
   const [outputMode, setOutputMode] = useState<'image' | 'video'>('image');
@@ -433,7 +125,7 @@ export default function AIBoardPage() {
   const [showGenerateModal, setShowGenerateModal] = useState(false);
   const [generateTotalCount, setGenerateTotalCount] = useState(0);
   const [activeDragId, setActiveDragId] = useState<string | null>(null);
-  const [dragOverId, setDragOverId] = useState<string | null>(null);
+  const [_dragOverId, setDragOverId] = useState<string | null>(null);
   const [pendingCutCount, setPendingCutCount] = useState<number | null>(null);
   const [deleteShotId, setDeleteShotId] = useState<string | null>(null);
   const [showShotDeletedToast, setShowShotDeletedToast] = useState(false);
@@ -535,7 +227,10 @@ export default function AIBoardPage() {
     const h = () => { setShowAspectDropdown(false); setShowCutDropdown(false); setShowModelDropdown(false); setShowResDropdown(false); };
     window.addEventListener('click', h); return () => window.removeEventListener('click', h);
   }, []);
-  useEffect(() => { return () => { Object.values(progressTimers.current).forEach(clearInterval); }; }, []);
+  useEffect(() => {
+    const timers = progressTimers.current;
+    return () => { Object.values(timers).forEach(clearInterval); };
+  }, []);
 
   const showToast = useCallback((message: string, type: 'success' | 'error' | 'info' = 'info') => { setToast({ message, type }); }, []);
 
@@ -626,8 +321,7 @@ export default function AIBoardPage() {
     progressTimers.current[id] = timer;
     try {
       const cur = shotsRef.current.find((s) => s.id === id);
-      const supabaseUrl = import.meta.env.VITE_PUBLIC_SUPABASE_URL as string;
-      const fnUrl = `${supabaseUrl}/functions/v1/generate-image`;
+      const fnUrl = `${SUPABASE_URL}/functions/v1/generate-image`;
       const imgUrl = await generateShotImage(cur?.prompt ?? '', cur?.shotType ?? 'Wide Shot', aspectRatio, model, fnUrl);
       clearInterval(timer);
       delete progressTimers.current[id];

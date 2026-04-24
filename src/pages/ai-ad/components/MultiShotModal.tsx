@@ -616,11 +616,13 @@ export default function MultiShotModal({ onClose }: MultiShotModalProps) {
 
       // ── DB에 결과 저장 (첫 번째 영상 URL로) ──
       if (!abortRef.current) {
-        await supabase.from('ad_works').update({
-          result_url: collectedUrls[0],
-          step_status: { step: 'done', all_video_urls: collectedUrls },
-          updated_at: new Date().toISOString(),
-        }).eq('id', jobId).catch(() => {});
+        try {
+          await supabase.from('ad_works').update({
+            result_url: collectedUrls[0],
+            step_status: { step: 'done', all_video_urls: collectedUrls },
+            updated_at: new Date().toISOString(),
+          }).eq('id', jobId);
+        } catch { /* 무시 */ }
       }
 
       // ── 완료 ──

@@ -1,4 +1,5 @@
 import { useState, useEffect, useCallback } from 'react';
+import { getAuthorizationHeader } from '@/lib/env';
 
 interface CreditCost {
   id?: string;
@@ -69,7 +70,7 @@ export default function CreditCostPanel({ isDark, onSave }: Props) {
     setLoading(true);
     try {
       const base = `${import.meta.env.VITE_PUBLIC_SUPABASE_URL}/functions/v1/admin-api-keys`;
-      const headers = { 'Authorization': `Bearer ${import.meta.env.VITE_PUBLIC_SUPABASE_ANON_KEY}` };
+      const headers = { 'Authorization': getAuthorizationHeader() };
       const res = await fetch(`${base}?action=get_credit_costs`, { headers });
       const data = await res.json();
       if (data.credit_costs) {
@@ -114,7 +115,7 @@ export default function CreditCostPanel({ isDark, onSave }: Props) {
       const res = await fetch(`${base}?action=update_credit_cost`, {
         method: 'PATCH',
         headers: {
-          'Authorization': `Bearer ${import.meta.env.VITE_PUBLIC_SUPABASE_ANON_KEY}`,
+          'Authorization': getAuthorizationHeader(),
           'Content-Type': 'application/json',
         },
         body: JSON.stringify({ category, model_id: modelId, is_active: !currentActive }),
@@ -138,7 +139,7 @@ export default function CreditCostPanel({ isDark, onSave }: Props) {
     try {
       const base = `${import.meta.env.VITE_PUBLIC_SUPABASE_URL}/functions/v1/admin-api-keys`;
       const headers = {
-        'Authorization': `Bearer ${import.meta.env.VITE_PUBLIC_SUPABASE_ANON_KEY}`,
+        'Authorization': getAuthorizationHeader(),
         'Content-Type': 'application/json',
       };
 
@@ -197,7 +198,7 @@ export default function CreditCostPanel({ isDark, onSave }: Props) {
     try {
       const base = `${import.meta.env.VITE_PUBLIC_SUPABASE_URL}/functions/v1/admin-api-keys`;
       const headers = {
-        'Authorization': `Bearer ${import.meta.env.VITE_PUBLIC_SUPABASE_ANON_KEY}`,
+        'Authorization': getAuthorizationHeader(),
         'Content-Type': 'application/json',
       };
 

@@ -1,4 +1,5 @@
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
+import { requireUser, AuthFailure } from '../_shared/auth.ts';
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -19,6 +20,15 @@ function err(msg: string, status = 400) {
 Deno.serve(async (req) => {
   if (req.method === 'OPTIONS') return new Response('ok', { headers: corsHeaders });
 
+  let authedUserId: string;
+  try {
+    const authed = await requireUser(req);
+    authedUserId = authed.id;
+  } catch (e) {
+    if (e instanceof AuthFailure) return e.response;
+    throw e;
+  }
+
   const supabase = createClient(
     Deno.env.get('SUPABASE_URL')!,
     Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!,
@@ -33,6 +43,7 @@ Deno.serve(async (req) => {
     if (req.method === 'POST' && action === 'check_and_notify') {
       const body = await req.json();
       const { user_id, current_balance, max_balance } = body;
+      if (user_id && user_id !== authedUserId) return err('forbidden', 403);
       if (!user_id || current_balance === undefined) return err('user_id and current_balance required');
 
       const { data: settings } = await supabase
@@ -87,6 +98,7 @@ Deno.serve(async (req) => {
     if (req.method === 'POST' && action === 'generation_in_progress') {
       const body = await req.json();
       const { user_id, generation_type, model_name, client_job_id } = body;
+      if (user_id && user_id !== authedUserId) return err('forbidden', 403);
       if (!user_id || !generation_type) return err('user_id and generation_type required');
 
       const typeLabels: Record<string, string> = {
@@ -123,6 +135,7 @@ Deno.serve(async (req) => {
     if (req.method === 'POST' && action === 'generation_complete') {
       const body = await req.json();
       const { user_id, generation_type, model_name, credits_used, result_url, action_url, notification_id } = body;
+      if (user_id && user_id !== authedUserId) return err('forbidden', 403);
       if (!user_id || !generation_type) return err('user_id and generation_type required');
 
       const typeLabels: Record<string, string> = {
@@ -181,6 +194,7 @@ Deno.serve(async (req) => {
     if (req.method === 'POST' && action === 'generation_failed') {
       const body = await req.json();
       const { user_id, generation_type, model_name, error_message, notification_id } = body;
+      if (user_id && user_id !== authedUserId) return err('forbidden', 403);
       if (!user_id || !generation_type) return err('user_id and generation_type required');
 
       const typeLabels: Record<string, string> = {
@@ -252,6 +266,7 @@ Deno.serve(async (req) => {
     if (req.method === 'POST' && action === 'send_welcome') {
       const body = await req.json();
       const { user_id, display_name } = body;
+      if (user_id && user_id !== authedUserId) return err('forbidden', 403);
       if (!user_id) return err('user_id required');
 
       const name = display_name ?? '사용자';
@@ -297,6 +312,7 @@ Deno.serve(async (req) => {
     if (req.method === 'POST' && action === 'mark_read') {
       const body = await req.json();
       const { user_id, notification_id, mark_all, type_filter } = body;
+      if (user_id && user_id !== authedUserId) return err('forbidden', 403);
       if (!user_id) return err('user_id required');
 
       if (mark_all) {
@@ -326,6 +342,7 @@ Deno.serve(async (req) => {
     if (req.method === 'POST' && action === 'save_settings') {
       const body = await req.json();
       const { user_id, threshold_pct, threshold_amount, alert_on_pct, alert_on_amount, email_enabled, alert_cooldown_hours } = body;
+      if (user_id && user_id !== authedUserId) return err('forbidden', 403);
       if (!user_id) return err('user_id required');
 
       const upsertData = {
@@ -377,6 +394,7 @@ Deno.serve(async (req) => {
     if (req.method === 'POST' && action === 'admin_test_send') {
       const body = await req.json();
       const { user_id, test_type } = body;
+      if (user_id && user_id !== authedUserId) return err('forbidden', 403);
       if (!user_id) return err('user_id required');
 
       const { data: profile } = await supabase.from('user_profiles').select('email, display_name, credit_balance').eq('id', user_id).maybeSingle();

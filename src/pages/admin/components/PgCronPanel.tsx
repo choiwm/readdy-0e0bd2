@@ -1,4 +1,5 @@
 import { useState, useEffect, useCallback } from 'react';
+import { getAuthorizationHeader } from '@/lib/env';
 
 // ── Types ──────────────────────────────────────────────────────────────────
 interface CronJob {
@@ -179,6 +180,8 @@ function SqlBlock({ sql, isDark, label }: { sql: string; isDark: boolean; label?
 }
 
 // ── Main Component ─────────────────────────────────────────────────────────
+const CRON_BASE = `${import.meta.env.VITE_PUBLIC_SUPABASE_URL}/functions/v1/cron-manager`;
+
 export default function PgCronPanel({ isDark, onToast }: Props) {
   const [status, setStatus] = useState<StatusData | null>(null);
   const [setupSql, setSetupSql] = useState<SetupSqlData | null>(null);
@@ -189,11 +192,6 @@ export default function PgCronPanel({ isDark, onToast }: Props) {
   const [showPerService, setShowPerService] = useState(false);
   const [togglingJob, setTogglingJob] = useState<string | null>(null);
   const [deletingJob, setDeletingJob] = useState<string | null>(null);
-
-  const SUPABASE_URL = import.meta.env.VITE_PUBLIC_SUPABASE_URL;
-  const ANON_KEY = import.meta.env.VITE_PUBLIC_SUPABASE_ANON_KEY;
-  const cronBase = `${SUPABASE_URL}/functions/v1/cron-manager`;
-  const headers = { 'Authorization': `Bearer ${ANON_KEY}` };
 
   const t = {
     cardBg:    isDark ? 'bg-[#0f0f13]'         : 'bg-white',
@@ -212,7 +210,7 @@ export default function PgCronPanel({ isDark, onToast }: Props) {
   const loadStatus = useCallback(async () => {
     setLoading(true);
     try {
-      const res = await fetch(`${cronBase}?action=check_status`, { headers });
+      const res = await fetch(`${CRON_BASE}?action=check_status`, { headers: { Authorization: getAuthorizationHeader() } });
       const data = await res.json();
       setStatus(data);
     } catch (e) {
@@ -226,7 +224,7 @@ export default function PgCronPanel({ isDark, onToast }: Props) {
   const loadSetupSql = useCallback(async (intervalMin: number) => {
     setSqlLoading(true);
     try {
-      const res = await fetch(`${cronBase}?action=get_setup_sql&interval_min=${intervalMin}`, { headers });
+      const res = await fetch(`${CRON_BASE}?action=get_setup_sql&interval_min=${intervalMin}`, { headers: { Authorization: getAuthorizationHeader() } });
       const data = await res.json();
       setSetupSql(data);
     } catch (e) {
@@ -239,7 +237,7 @@ export default function PgCronPanel({ isDark, onToast }: Props) {
   useEffect(() => {
     loadStatus();
     loadSetupSql(selectedInterval);
-  }, [loadStatus, loadSetupSql]);
+  }, [loadStatus, loadSetupSql, selectedInterval]);
 
   useEffect(() => {
     loadSetupSql(selectedInterval);
@@ -249,9 +247,9 @@ export default function PgCronPanel({ isDark, onToast }: Props) {
   const handleToggleJob = async (jobname: string, active: boolean) => {
     setTogglingJob(jobname);
     try {
-      const res = await fetch(`${cronBase}?action=toggle_job`, {
+      const res = await fetch(`${CRON_BASE}?action=toggle_job`, {
         method: 'PATCH',
-        headers: { ...headers, 'Content-Type': 'application/json' },
+        headers: { Authorization: getAuthorizationHeader(), 'Content-Type': 'application/json' },
         body: JSON.stringify({ jobname, active }),
       });
       const data = await res.json();
@@ -272,9 +270,9 @@ export default function PgCronPanel({ isDark, onToast }: Props) {
   const handleDeleteJob = async (jobname: string) => {
     setDeletingJob(jobname);
     try {
-      const res = await fetch(`${cronBase}?action=delete_job`, {
+      const res = await fetch(`${CRON_BASE}?action=delete_job`, {
         method: 'DELETE',
-        headers: { ...headers, 'Content-Type': 'application/json' },
+        headers: { Authorization: getAuthorizationHeader(), 'Content-Type': 'application/json' },
         body: JSON.stringify({ jobname }),
       });
       const data = await res.json();

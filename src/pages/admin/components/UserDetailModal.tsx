@@ -1,53 +1,32 @@
 import { useState } from 'react';
-import type { User } from '../types';
-import { PlanBadge, StatusBadge } from './Badges';
+import { StatusBadge, PlanBadge } from './Badges';
+import type { UserRecord, UserStatus } from '../types';
 
-interface Props {
-  user: User;
+interface UserDetailModalProps {
+  user: UserRecord;
   onClose: () => void;
-  onCreditAdjust: (userId: string, delta: number) => void;
-  onStatusChange: (userId: string, status: User['status']) => void;
   isDark: boolean;
+  onCreditAdjust?: (userId: string, amount: string) => void;
+  onStatusChange?: (userId: string, status: UserStatus) => void;
 }
 
-export default function UserDetailModal({ user, onClose, onCreditAdjust, onStatusChange, isDark }: Props) {
+export default function UserDetailModal({
+  user, onClose, isDark, onCreditAdjust, onStatusChange,
+}: UserDetailModalProps) {
   const [creditAdjust, setCreditAdjust] = useState('');
-  const [creditError, setCreditError] = useState('');
-
   const m = {
-    bg:        isDark ? 'bg-[#0f0f13]'    : 'bg-white',
-    border:    isDark ? 'border-white/10' : 'border-gray-200',
-    borderSub: isDark ? 'border-white/5'  : 'border-gray-100',
-    text:      isDark ? 'text-white'      : 'text-gray-900',
-    textSub:   isDark ? 'text-zinc-500'   : 'text-gray-500',
-    textFaint: isDark ? 'text-zinc-600'   : 'text-gray-400',
-    cardBg:    isDark ? 'bg-zinc-900/60'  : 'bg-gray-50',
-    inputBg:   isDark ? 'bg-zinc-900 border-white/10 text-white placeholder-zinc-600' : 'bg-gray-50 border-gray-200 text-gray-900 placeholder-gray-400',
-    closeBtn:  isDark ? 'text-zinc-500 hover:text-white' : 'text-gray-400 hover:text-gray-700',
-    cancelBtn: isDark ? 'bg-zinc-800 text-zinc-300 hover:bg-zinc-700' : 'bg-gray-100 text-gray-600 hover:bg-gray-200',
-    labelText: isDark ? 'text-zinc-400'   : 'text-gray-500',
+    bg:       isDark ? 'bg-[#0f0f13]'    : 'bg-white',
+    border:   isDark ? 'border-white/10' : 'border-gray-200',
+    borderSub:isDark ? 'border-white/5'  : 'border-gray-100',
+    text:     isDark ? 'text-white'      : 'text-slate-900',
+    textSub:  isDark ? 'text-zinc-300'   : 'text-slate-600',
+    textFaint:isDark ? 'text-zinc-500'   : 'text-slate-500',
+    cardBg:   isDark ? 'bg-zinc-900/60'  : 'bg-slate-50',
+    inputBg:  isDark ? 'bg-zinc-900 border-white/10 text-white placeholder-zinc-500' : 'bg-white border-slate-300 text-slate-900 placeholder-slate-400',
+    closeBtn: isDark ? 'text-zinc-400 hover:text-white' : 'text-slate-500 hover:text-slate-800',
+    cancelBtn:isDark ? 'bg-zinc-800 text-zinc-200 hover:bg-zinc-700' : 'bg-slate-100 text-slate-700 hover:bg-slate-200',
+    labelText:isDark ? 'text-zinc-400'   : 'text-slate-600',
   };
-
-  const handleApplyCredit = () => {
-    const val = parseInt(creditAdjust, 10);
-    if (isNaN(val) || val === 0) {
-      setCreditError('유효한 숫자를 입력하세요 (예: +500 또는 -200)');
-      return;
-    }
-    setCreditError('');
-    onCreditAdjust(user.id, val);
-    setCreditAdjust('');
-  };
-
-  const handleStatusToggle = () => {
-    if (user.status === 'active') {
-      onStatusChange(user.id, 'suspended');
-    } else {
-      onStatusChange(user.id, 'active');
-    }
-    onClose();
-  };
-
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
       <div className="absolute inset-0 bg-black/70" onClick={onClose} />
@@ -66,8 +45,8 @@ export default function UserDetailModal({ user, onClose, onCreditAdjust, onStatu
             <p className={`text-base font-semibold ${m.text}`}>{user.name}</p>
             <p className={`text-sm ${m.textSub}`}>{user.email}</p>
             <div className="flex items-center gap-2 mt-1.5">
-              <PlanBadge plan={user.plan} />
-              <StatusBadge status={user.status} />
+              <PlanBadge plan={user.plan} isDark={isDark} />
+              <StatusBadge status={user.status} isDark={isDark} />
             </div>
           </div>
         </div>
@@ -92,31 +71,35 @@ export default function UserDetailModal({ user, onClose, onCreditAdjust, onStatu
             <input
               type="number"
               value={creditAdjust}
-              onChange={(e) => { setCreditAdjust(e.target.value); setCreditError(''); }}
-              placeholder="예: 500 또는 -200"
+              onChange={(e) => setCreditAdjust(e.target.value)}
+              placeholder="예: +500 또는 -200"
               className={`flex-1 border rounded-xl px-3 py-2 text-sm focus:outline-none focus:border-indigo-500/50 ${m.inputBg}`}
             />
             <button
-              onClick={handleApplyCredit}
+              onClick={() => {
+                if (!creditAdjust.trim()) return;
+                onCreditAdjust?.(user.id, creditAdjust);
+                setCreditAdjust('');
+                onClose();
+              }}
               className="px-4 py-2 bg-indigo-500 hover:bg-indigo-400 text-white text-xs font-bold rounded-xl cursor-pointer transition-colors whitespace-nowrap"
             >
               적용
             </button>
           </div>
-          {creditError && <p className="text-[11px] text-red-400 mt-1.5">{creditError}</p>}
         </div>
         <div className="flex gap-2">
           {user.status === 'active' ? (
             <button
-              onClick={handleStatusToggle}
-              className="flex-1 py-2.5 bg-red-500/15 border border-red-500/25 text-red-400 text-xs font-bold rounded-xl cursor-pointer hover:bg-red-500/25 transition-colors whitespace-nowrap"
+              onClick={() => { onStatusChange?.(user.id, 'suspended'); onClose(); }}
+              className={`flex-1 py-2.5 text-xs font-bold rounded-xl cursor-pointer transition-colors whitespace-nowrap border ${isDark ? 'bg-red-500/15 border-red-500/25 text-red-400 hover:bg-red-500/25' : 'bg-red-50 border-red-300 text-red-700 hover:bg-red-100'}`}
             >
               <i className="ri-forbid-line mr-1.5" />계정 정지
             </button>
           ) : (
             <button
-              onClick={handleStatusToggle}
-              className="flex-1 py-2.5 bg-emerald-500/15 border border-emerald-500/25 text-emerald-400 text-xs font-bold rounded-xl cursor-pointer hover:bg-emerald-500/25 transition-colors whitespace-nowrap"
+              onClick={() => { onStatusChange?.(user.id, 'active'); onClose(); }}
+              className={`flex-1 py-2.5 text-xs font-bold rounded-xl cursor-pointer transition-colors whitespace-nowrap border ${isDark ? 'bg-emerald-500/15 border-emerald-500/25 text-emerald-400 hover:bg-emerald-500/25' : 'bg-emerald-50 border-emerald-300 text-emerald-700 hover:bg-emerald-100'}`}
             >
               <i className="ri-check-line mr-1.5" />계정 복구
             </button>

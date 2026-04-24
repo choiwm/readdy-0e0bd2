@@ -1,4 +1,5 @@
 import { useState, useEffect, useCallback } from 'react';
+import { getAuthorizationHeader } from '@/lib/env';
 
 interface Team {
   id: string;
@@ -44,7 +45,7 @@ interface Props {
 }
 
 const BASE_URL = `${import.meta.env.VITE_PUBLIC_SUPABASE_URL}/functions/v1/admin-teams`;
-const HEADERS = { 'Authorization': `Bearer ${import.meta.env.VITE_PUBLIC_SUPABASE_ANON_KEY}`, 'Content-Type': 'application/json' };
+const HEADERS = { 'Authorization': getAuthorizationHeader(), 'Content-Type': 'application/json' };
 
 const ROLE_LABELS: Record<string, string> = {
   owner: '오너', admin: '관리자', member: '멤버', viewer: '뷰어',

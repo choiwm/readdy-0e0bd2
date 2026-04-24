@@ -1,4 +1,5 @@
 import { supabase } from '@/lib/supabase';
+import { logDev } from '@/lib/logger';
 
 const UPLOAD_TIMEOUT_MS = 20000; // 20초 타임아웃
 const MAX_FILE_SIZE = 8 * 1024 * 1024; // 8MB
@@ -86,7 +87,7 @@ async function uploadToStorage(blob: Blob, userId: string): Promise<string | nul
       return null;
     }
 
-    console.log('[uploadProductImage] Storage 업로드 성공:', signedData.signedUrl.slice(0, 80));
+    logDev('[uploadProductImage] Storage 업로드 성공:', signedData.signedUrl.slice(0, 80));
     return signedData.signedUrl;
   } catch (e) {
     console.warn('[uploadProductImage] Storage 업로드 예외:', e);
@@ -161,7 +162,7 @@ export async function uploadProductImageToStorage(
   // fal.ai는 base64 data URL을 image_url로 직접 받을 수 있음
   try {
     const base64 = await blobToBase64(blob);
-    console.log('[uploadProductImage] base64 폴백 사용, 크기:', Math.round(blob.size / 1024), 'KB');
+    logDev('[uploadProductImage] base64 폴백 사용, 크기:', Math.round(blob.size / 1024), 'KB');
     return base64;
   } catch (e) {
     throw new Error(`이미지 변환 실패: ${e instanceof Error ? e.message : String(e)}`);

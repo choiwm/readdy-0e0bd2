@@ -1,8 +1,6 @@
 import { useState, useRef, useEffect } from 'react';
 import { Voice } from '@/mocks/voiceLibrary';
 import PageHeader from '@/components/feature/PageHeader';
-import SidebarCredits from '@/pages/ai-sound/components/SidebarCredits';
-import SidebarUpgrade from '@/pages/ai-sound/components/SidebarUpgrade';
 import { SpeechSidebarContent, SpeechModel, SpeechParams } from '@/pages/ai-sound/components/SpeechSidebarContent';
 import { EffectsSidebarContent } from '@/pages/ai-sound/components/EffectsPanel';
 import { MusicSidebarContent } from '@/pages/ai-sound/components/MusicPanel';
@@ -40,7 +38,7 @@ interface FilterSidebarProps {
   activeIcon: SidebarIcon;
   setActiveIcon: (i: SidebarIcon) => void;
   selectedVoice: Voice | null;
-  starredIds: Set<number>;
+  starredIds: Set<string | number>;
   langFilters: Set<string>;
   setLangFilters: (f: Set<string>) => void;
   credits: number;
@@ -217,9 +215,9 @@ export function SoundIconRail({
 export default function FilterSidebar({
   voiceTab, setVoiceTab, genderFilter, setGenderFilter, sortBy, setSortBy,
   speechModel, setSpeechModel, speechParams, setSpeechParams,
-  activeIcon, setActiveIcon, selectedVoice, starredIds,
+  activeIcon, setActiveIcon: _setActiveIcon, selectedVoice: _selectedVoice, starredIds,
   langFilters, setLangFilters, credits, maxCredits,
-  onGenerateStart, onGenerateComplete, onClose,
+  onGenerateStart: _onGenerateStart, onGenerateComplete: _onGenerateComplete, onClose,
 }: FilterSidebarProps) {
   const panelTitle: Record<SidebarIcon, string> = {
     Voices: '보이스', Speech: 'Speech', Effects: '효과음',

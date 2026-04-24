@@ -21,14 +21,6 @@ import type { AudioHistoryItemExtended } from '@/hooks/useAudioHistory';
 import { useAuth } from '@/hooks/useAuth';
 import InsufficientCreditsModal from '@/components/base/InsufficientCreditsModal';
 
-function timeAgo(iso: string): string {
-  const diff = Date.now() - new Date(iso).getTime();
-  const h = Math.floor(diff / 3600000);
-  if (h < 1) return '방금 전';
-  if (h < 24) return `${h}시간 전`;
-  return `${Math.floor(h / 24)}일 전`;
-}
-
 // eslint-disable-next-line @typescript-eslint/no-unused-vars
 function formatDuration(s: number): string {
   const m = Math.floor(s / 60);
@@ -49,7 +41,7 @@ export default function AISoundPage() {
   });
   const progressTimerRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const [visibleCount, setVisibleCount] = useState(9);
-  const [starredIds, setStarredIds] = useState<Set<number>>(new Set());
+  const [starredIds, setStarredIds] = useState<Set<string | number>>(new Set());
   const [langFilters, setLangFilters] = useState<Set<string>>(new Set());
   const [toasts, setToasts] = useState<ToastItem[]>([]);
   const [highlightedId, setHighlightedId] = useState<string | null>(null);
@@ -118,7 +110,7 @@ export default function AISoundPage() {
     return () => { document.body.style.overflow = ''; };
   }, [mobileSidebarOpen, mobileHistoryOpen]);
 
-  const handleToggleStar = useCallback((id: number) => {
+  const handleToggleStar = useCallback((id: string | number) => {
     setStarredIds((prev) => {
       const next = new Set(prev);
       if (next.has(id)) next.delete(id); else next.add(id);

@@ -136,7 +136,7 @@ async function convertImage(
 
       if (cropMode === 'crop') {
         // 센터 크롭: 타겟 비율로 꽉 채우고 넘치는 부분 잘라냄
-        let drawW: number, drawH: number, sx: number, sy: number, sw: number, sh: number;
+        let sx: number, sy: number, sw: number, sh: number;
         if (srcRatio > tgtRatio) {
           // 원본이 더 넓음 → 높이 맞추고 좌우 크롭
           sh = srcH;
@@ -150,8 +150,8 @@ async function convertImage(
           sx = 0;
           sy = (srcH - sh) / 2;
         }
-        drawW = targetW;
-        drawH = targetH;
+        const drawW = targetW;
+        const drawH = targetH;
         ctx.drawImage(img, sx, sy, sw, sh, 0, 0, drawW, drawH);
       } else {
         // 레터박스: 원본 비율 유지 + 검정 여백
@@ -290,9 +290,12 @@ export default function SnsExportModal({ url, type, title, originalRatio, onClos
   // 초기 선택
   useEffect(() => {
     setSelectedFormat(platform.formats[0]);
-  }, []);
+  }, [platform.formats]);
 
-  const getFormatKey = (fmt: SnsFormat) => `${selectedPlatform}_${fmt.ratio}_${fmt.label}`;
+  const getFormatKey = useCallback(
+    (fmt: SnsFormat) => `${selectedPlatform}_${fmt.ratio}_${fmt.label}`,
+    [selectedPlatform],
+  );
 
   const isRatioMatch = (fmt: SnsFormat) => fmt.ratio === originalRatio;
 
@@ -335,7 +338,7 @@ export default function SnsExportModal({ url, type, title, originalRatio, onClos
       setDownloadStates((prev) => ({ ...prev, [key]: 'error' }));
       setTimeout(() => setDownloadStates((prev) => ({ ...prev, [key]: 'idle' })), 2500);
     }
-  }, [url, type, title, selectedPlatform, cropMode]);
+  }, [url, type, title, selectedPlatform, cropMode, getFormatKey]);
 
   /** 현재 플랫폼 전체 포맷 일괄 다운로드 */
   const handleBulkDownload = useCallback(async () => {

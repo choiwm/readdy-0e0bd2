@@ -1,5 +1,6 @@
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
+import { requireUser, AuthFailure } from '../_shared/auth.ts';
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -95,6 +96,15 @@ serve(async (req) => {
     return new Response("ok", { headers: corsHeaders });
   }
 
+  let authedUserId: string;
+  try {
+    const authed = await requireUser(req);
+    authedUserId = authed.id;
+  } catch (e) {
+    if (e instanceof AuthFailure) return e.response;
+    throw e;
+  }
+
   const supabase = createClient(Deno.env.get('SUPABASE_URL')!, Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!);
 
   try {
@@ -113,7 +123,8 @@ serve(async (req) => {
     const audioFile = formData.get("audio") as File | null;
     const mode = (formData.get("mode") as string) || "noise";
     const intensity = parseInt((formData.get("intensity") as string) || "75");
-    const userId = formData.get("user_id") as string | null;
+    // JWT로 검증된 사용자 ID를 사용 — 본문의 user_id는 신뢰하지 않음
+    const userId = authedUserId;
     const sessionId = formData.get("session_id") as string | null;
 
     if (!audioFile) {

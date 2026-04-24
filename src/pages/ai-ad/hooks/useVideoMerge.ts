@@ -1,4 +1,5 @@
 import { useState, useRef, useCallback } from 'react';
+import { logDev } from '@/lib/logger';
 import { supabase } from '@/lib/supabase';
 
 export type MergeStatus = 'idle' | 'merging' | 'done' | 'error' | 'unsupported';
@@ -263,7 +264,7 @@ export function useVideoMerge(): UseVideoMergeReturn {
 
       // 2. fal.ai storage에 업로드
       setConvertProgress(20);
-      console.log('[useVideoMerge] fal.ai 업로드 시작, size:', blob.size);
+      logDev('[useVideoMerge] fal.ai 업로드 시작, size:', blob.size);
       const uploadData = await invokeAction('upload_to_fal', {
         webm_base64: base64,
         content_type: blob.type || 'video/webm',
@@ -273,7 +274,7 @@ export function useVideoMerge(): UseVideoMergeReturn {
 
       const uploadedUrl = uploadData.url as string;
       if (!uploadedUrl) throw new Error('업로드 URL을 받지 못했습니다');
-      console.log('[useVideoMerge] 업로드 완료:', uploadedUrl);
+      logDev('[useVideoMerge] 업로드 완료:', uploadedUrl);
 
       // 3. ffmpeg-api/compose로 MP4 변환 요청
       setConvertStatus('converting');
@@ -302,7 +303,7 @@ export function useVideoMerge(): UseVideoMergeReturn {
           setMp4Url(finalMp4Url);
           setConvertProgress(100);
           setConvertStatus('done');
-          console.log('[useVideoMerge] MP4 변환 완료:', finalMp4Url);
+          logDev('[useVideoMerge] MP4 변환 완료:', finalMp4Url);
           return;
         }
 

@@ -1,4 +1,5 @@
 import { useState, useEffect, useCallback } from 'react';
+import { getAuthorizationHeader } from '@/lib/env';
 
 interface TeamStat {
   id: string;
@@ -163,7 +164,7 @@ export default function TeamStatsDashboard({ isDark, onNavigateToTeams }: TeamSt
     setLoading(true);
     try {
       const base = `${import.meta.env.VITE_PUBLIC_SUPABASE_URL}/functions/v1/admin-teams`;
-      const headers = { 'Authorization': `Bearer ${import.meta.env.VITE_PUBLIC_SUPABASE_ANON_KEY}` };
+      const headers = { 'Authorization': getAuthorizationHeader() };
       const res = await fetch(`${base}?action=team_content_stats`, { headers });
       const data = await res.json();
       if (data.teams && data.teams.length > 0) {

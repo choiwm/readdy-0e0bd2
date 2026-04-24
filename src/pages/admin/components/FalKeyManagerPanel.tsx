@@ -1,4 +1,5 @@
 import { useState, useCallback, useEffect } from 'react';
+import { getAuthorizationHeader } from '@/lib/env';
 
 interface FalApiKey {
   key_id: string;
@@ -16,7 +17,7 @@ interface Props {
 
 const BASE_URL = `${import.meta.env.VITE_PUBLIC_SUPABASE_URL}/functions/v1/fal-key-manager`;
 const HEADERS = {
-  'Authorization': `Bearer ${import.meta.env.VITE_PUBLIC_SUPABASE_ANON_KEY}`,
+  'Authorization': getAuthorizationHeader(),
   'Content-Type': 'application/json',
 };
 

@@ -1,4 +1,5 @@
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
+import { requireUser, AuthFailure } from '../_shared/auth.ts';
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -118,6 +119,13 @@ function diagnoseFalError(body: string, headers: Record<string, string>): Record
 
 Deno.serve(async (req) => {
   if (req.method === 'OPTIONS') return new Response('ok', { headers: corsHeaders });
+
+  try {
+    await requireUser(req);
+  } catch (e) {
+    if (e instanceof AuthFailure) return e.response;
+    throw e;
+  }
 
   const supabase = createClient(
     Deno.env.get('SUPABASE_URL')!,

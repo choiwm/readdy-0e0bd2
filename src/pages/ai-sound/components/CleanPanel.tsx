@@ -3,6 +3,7 @@ import PageHeader from '@/components/feature/PageHeader';
 import SidebarCredits from '@/pages/ai-sound/components/SidebarCredits';
 import SidebarUpgrade from '@/pages/ai-sound/components/SidebarUpgrade';
 import { supabase } from '@/lib/supabase';
+import { SUPABASE_URL } from '@/lib/env';
 import { uploadUrlToStorage } from '@/hooks/useSfxStore';
 
 type CleanMode = 'noise' | 'isolate' | 'separate';
@@ -345,8 +346,6 @@ export function CleanSidebarContent({ credits, maxCredits }: CleanSidebarContent
     </div>
   );
 }
-
-const SUPABASE_URL = import.meta.env.VITE_PUBLIC_SUPABASE_URL as string;
 
 interface CleanPanelProps {
   onDeductCredits?: (key: import('@/pages/ai-sound/hooks/useSoundCredits').SoundCostKey) => boolean;

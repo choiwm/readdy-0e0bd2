@@ -1,4 +1,5 @@
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
+import { requireAdmin, AuthFailure, writeAuditLog, type AuthedAdmin } from '../_shared/auth.ts';
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -19,6 +20,14 @@ function err(msg: string, status = 400) {
 
 Deno.serve(async (req) => {
   if (req.method === 'OPTIONS') return new Response('ok', { headers: corsHeaders });
+
+  let admin: AuthedAdmin;
+  try {
+    admin = await requireAdmin(req);
+  } catch (e) {
+    if (e instanceof AuthFailure) return e.response;
+    throw e;
+  }
 
   const supabase = createClient(
     Deno.env.get('SUPABASE_URL')!,
@@ -60,7 +69,7 @@ Deno.serve(async (req) => {
     // IP 차단 등록 - reason 기본값 처리
     if (req.method === 'POST' && action === 'block_ip') {
       const body = await req.json();
-      const { ip_address, reason, admin_email, expires_at } = body;
+      const { ip_address, reason, expires_at } = body;
       if (!ip_address) return err('ip_address required');
 
       // reason이 없으면 기본값 사용
@@ -71,7 +80,7 @@ Deno.serve(async (req) => {
         .insert({
           ip_address,
           reason: blockReason,
-          blocked_by_email: admin_email ?? 'admin',
+          blocked_by_email: admin.email,
           is_active: true,
           expires_at: expires_at ?? null,
         })
@@ -80,14 +89,11 @@ Deno.serve(async (req) => {
 
       if (error) return err(error.message);
 
-      await supabase.from('audit_logs').insert({
-        admin_email: admin_email ?? 'admin',
-        action: 'IP 차단 등록',
+      await writeAuditLog(supabase, admin, 'IP 차단 등록', {
         target_type: 'security',
         target_id: data.id,
         target_label: ip_address,
         detail: blockReason,
-        result: 'success',
       });
 
       return json({ ip_block: data }, 201);
@@ -96,7 +102,7 @@ Deno.serve(async (req) => {
     // IP 차단 해제
     if (req.method === 'PATCH' && action === 'unblock_ip') {
       const body = await req.json();
-      const { id, admin_email } = body;
+      const { id } = body;
       if (!id) return err('id required');
 
       const { data, error } = await supabase
@@ -108,13 +114,10 @@ Deno.serve(async (req) => {
 
       if (error) return err(error.message);
 
-      await supabase.from('audit_logs').insert({
-        admin_email: admin_email ?? 'admin',
-        action: 'IP 차단 해제',
+      await writeAuditLog(supabase, admin, 'IP 차단 해제', {
         target_type: 'security',
         target_id: id,
         target_label: data.ip_address,
-        result: 'success',
       });
 
       return json({ ip_block: data });
@@ -148,7 +151,7 @@ Deno.serve(async (req) => {
     // 관리자 계정 생성
     if (req.method === 'POST' && action === 'create_admin') {
       const body = await req.json();
-      const { email, display_name, role, permissions, admin_email } = body;
+      const { email, display_name, role, permissions } = body;
       if (!email || !role) return err('email and role required');
 
       const { data, error } = await supabase
@@ -166,14 +169,11 @@ Deno.serve(async (req) => {
 
       if (error) return err(error.message);
 
-      await supabase.from('audit_logs').insert({
-        admin_email: admin_email ?? 'admin',
-        action: '관리자 계정 생성',
+      await writeAuditLog(supabase, admin, '관리자 계정 생성', {
         target_type: 'security',
         target_id: data.id,
         target_label: email,
         detail: `역할: ${role}`,
-        result: 'success',
       });
 
       return json({ admin: data }, 201);
@@ -182,7 +182,7 @@ Deno.serve(async (req) => {
     // 관리자 계정 수정
     if (req.method === 'PUT' && action === 'update_admin') {
       const body = await req.json();
-      const { id, display_name, role, permissions, is_active, two_factor_enabled, admin_email } = body;
+      const { id, display_name, role, permissions, is_active, two_factor_enabled } = body;
       if (!id) return err('id required');
 
       const updateData: Record<string, unknown> = { updated_at: new Date().toISOString() };
@@ -201,13 +201,10 @@ Deno.serve(async (req) => {
 
       if (error) return err(error.message);
 
-      await supabase.from('audit_logs').insert({
-        admin_email: admin_email ?? 'admin',
-        action: '관리자 계정 수정',
+      await writeAuditLog(supabase, admin, '관리자 계정 수정', {
         target_type: 'security',
         target_id: id,
         target_label: data.email,
-        result: 'success',
       });
 
       return json({ admin: data });

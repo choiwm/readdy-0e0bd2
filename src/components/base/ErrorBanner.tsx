@@ -1,3 +1,4 @@
+/* eslint-disable react-refresh/only-export-components */
 import { useState, useCallback } from 'react';
 
 // ── 에러 타입 분류 ─────────────────────────────────────────────────────────

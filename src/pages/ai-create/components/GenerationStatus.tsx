@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
+import { logDev } from '@/lib/logger';
 import { supabase } from '@/lib/supabase';
 
 interface Props {
@@ -98,14 +99,14 @@ export default function GenerationStatus({
       if (userId) reqBody.user_id = userId;
       else if (sessionId) reqBody.session_id = sessionId;
 
-      console.log('[GenerationStatus] generate-image 호출:', JSON.stringify(reqBody).slice(0, 200));
+      logDev('[GenerationStatus] generate-image 호출:', JSON.stringify(reqBody).slice(0, 200));
 
       const { data, error } = await supabase.functions.invoke('generate-image', { body: reqBody });
 
       if (abortRef.current) return;
 
-      console.log('[GenerationStatus] 응답 error:', error?.message ?? 'none');
-      console.log('[GenerationStatus] 응답 data:', JSON.stringify(data ?? {}).slice(0, 300));
+      logDev('[GenerationStatus] 응답 error:', error?.message ?? 'none');
+      logDev('[GenerationStatus] 응답 data:', JSON.stringify(data ?? {}).slice(0, 300));
 
       if (error) throw new Error(error.message ?? '이미지 생성 실패');
       if (!data) throw new Error('서버 응답이 없습니다.');
@@ -120,7 +121,7 @@ export default function GenerationStatus({
       setMsg('완료!');
       stopTimer();
 
-      console.log('[GenerationStatus] 이미지 완료:', imageUrl.slice(0, 80));
+      logDev('[GenerationStatus] 이미지 완료:', imageUrl.slice(0, 80));
       await new Promise((r) => setTimeout(r, 300));
       if (!abortRef.current) {
         onCompleteRef.current(imageUrl, ratioLabel, 'image');

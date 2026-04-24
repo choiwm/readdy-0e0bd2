@@ -116,7 +116,7 @@ export default function HistoryPanel({ items, onItemsChange, onRemoveItem, onRet
 
   const listRef  = useRef<HTMLDivElement>(null);
   const itemRefs = useRef<Record<string, HTMLDivElement | null>>({});
-  const { playingId, progress: playProgress, toggle, isPlaying } = useAudioPlayer();
+  const { playingId: _playingId, progress: playProgress, toggle, isPlaying } = useAudioPlayer();
 
   useEffect(() => {
     if (!highlightedId) return;

@@ -26,6 +26,10 @@ export interface User {
   projects: number;
 }
 
+export interface UserRecord extends User {
+  memberGrade: string;
+}
+
 export interface ContentItem {
   id: string;
   title: string;
@@ -103,4 +107,16 @@ export interface PaymentRecord {
   date: string;
   status: string;
   method: string;
+}
+
+export interface TeamRecord {
+  id: string;
+  name: string;
+  description: string | null;
+  owner_id: string | null;
+  status: 'active' | 'inactive' | 'archived';
+  content_access: 'shared' | 'private' | 'restricted';
+  max_members: number;
+  member_count: number;
+  created_at: string;
 }

@@ -1,4 +1,5 @@
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
+import { requireUser, AuthFailure } from '../_shared/auth.ts';
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -185,6 +186,15 @@ ${mainKeyword}이란 무엇인가요? 간단히 말하면, 우리 삶을 더 효
 
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") return new Response("ok", { headers: corsHeaders });
+
+  let authedUserId: string;
+  try {
+    const authed = await requireUser(req);
+    authedUserId = authed.id;
+  } catch (e) {
+    if (e instanceof AuthFailure) return e.response;
+    throw e;
+  }
 
   const supabase = createClient(Deno.env.get('SUPABASE_URL')!, Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!);
 

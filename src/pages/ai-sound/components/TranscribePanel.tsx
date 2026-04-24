@@ -178,7 +178,7 @@ export default function TranscribePanel({ onDeductCredits, credits = 999 }: Tran
     startFakeProgress(0, 30, 1500, '파일 업로드 중...');
     try {
       const { data: { session } } = await supabase.auth.getSession();
-      const authHeader = session?.access_token
+      const authHeader: Record<string, string> = session?.access_token
         ? { Authorization: `Bearer ${session.access_token}` }
         : {};
       const formData = new FormData();
@@ -377,7 +377,7 @@ export default function TranscribePanel({ onDeductCredits, credits = 999 }: Tran
       if (!res.ok || data.error) throw new Error(data.error ?? '요약 실패');
 
       setSummaryText(data.summaryText ?? '');
-    } catch (err) {
+    } catch (_err) {
       // AI 요약 실패 시 fallback: 앞부분 텍스트 사용
       const fallback = result.fullText.slice(0, 300) + (result.fullText.length > 300 ? '...' : '');
       setSummaryText(fallback);

@@ -1,5 +1,6 @@
 import { useState, useEffect, useCallback } from 'react';
 import { useAuth } from '@/hooks/useAuth';
+import { logError } from '@/utils/errorHandler';
 
 type AuthMode = 'login' | 'signup' | 'forgot';
 
@@ -102,7 +103,8 @@ export default function AuthModal({ isOpen, onClose, defaultMode = 'login' }: Au
       setResendDone(true);
       setError('');
       setSuccess('인증 메일을 재발송했습니다. 받은 편지함(스팸 폴더 포함)을 확인해주세요.');
-    } catch {
+    } catch (err) {
+      logError(err, { where: 'AuthModal.handleResendVerification' }, 'warn');
       setError('재발송 중 오류가 발생했습니다. 잠시 후 다시 시도해주세요.');
     }
     setResendLoading(false);

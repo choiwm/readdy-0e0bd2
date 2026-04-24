@@ -1,5 +1,6 @@
 import { useState, useRef, useEffect } from 'react';
 import { useAuth } from '@/hooks/useAuth';
+import { SUPABASE_URL, SUPABASE_ANON_KEY } from '@/lib/env';
 
 interface LogEntry {
   time: string;
@@ -11,9 +12,6 @@ interface LogEntry {
 function now() {
   return new Date().toLocaleTimeString('ko-KR', { hour12: false, hour: '2-digit', minute: '2-digit', second: '2-digit' });
 }
-
-const SUPABASE_URL = import.meta.env.VITE_PUBLIC_SUPABASE_URL as string;
-const SUPABASE_ANON_KEY = import.meta.env.VITE_PUBLIC_SUPABASE_ANON_KEY as string;
 
 async function callEdge(
   slug: string,

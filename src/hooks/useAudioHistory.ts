@@ -21,8 +21,8 @@ function getSessionId(): string {
   return sid;
 }
 
-// DB row → AudioHistoryItem 변환
-function rowToItem(row: Record<string, unknown>): AudioHistoryItem {
+// DB row → AudioHistoryItemExtended 변환
+function rowToItem(row: Record<string, unknown>): AudioHistoryItemExtended {
   return {
     id: row.id as string,
     title: row.title as string,

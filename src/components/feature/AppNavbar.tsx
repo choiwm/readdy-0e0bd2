@@ -20,7 +20,7 @@ interface AppNavbarProps {
 
 export default function AppNavbar({ active, hideBottomNav = false }: AppNavbarProps) {
   const { pathname } = useLocation();
-  const { isLoggedIn, user, profile, signOut, loading } = useAuth();
+  const { isLoggedIn: _isLoggedIn, user, profile, signOut, loading } = useAuth();
   const { notifications, unreadCount, markRead, markAllRead } = useNotifications();
   const [userMenuOpen, setUserMenuOpen] = useState(false);
   const [notifOpen, setNotifOpen] = useState(false);
@@ -94,6 +94,8 @@ export default function AppNavbar({ active, hideBottomNav = false }: AppNavbarPr
         <div ref={userMenuRef} className="relative">
           <button
             onClick={() => setUserMenuOpen(!userMenuOpen)}
+            aria-label="사용자 메뉴"
+            aria-expanded={userMenuOpen}
             className="h-8 flex items-center gap-1.5 bg-zinc-800 border border-zinc-700 hover:border-zinc-500 rounded-full pl-1.5 pr-2.5 transition-colors cursor-pointer"
           >
             <div className="w-5 h-5 rounded-full bg-gradient-to-br from-indigo-500 to-violet-600 flex items-center justify-center text-white text-[10px] font-bold flex-shrink-0">
@@ -281,6 +283,8 @@ export default function AppNavbar({ active, hideBottomNav = false }: AppNavbarPr
               <div ref={notifRef} className="relative flex-shrink-0">
                 <button
                   onClick={() => { setNotifOpen(!notifOpen); setUserMenuOpen(false); }}
+                  aria-label={`알림 ${unreadCount > 0 ? `(읽지 않음 ${unreadCount}개)` : ''}`}
+                  aria-expanded={notifOpen}
                   className={`relative w-8 h-8 flex items-center justify-center rounded-xl transition-all cursor-pointer ${
                     notifOpen ? 'bg-zinc-700 text-white' : 'text-zinc-400 hover:text-white hover:bg-zinc-800'
                   }`}
@@ -326,6 +330,8 @@ export default function AppNavbar({ active, hideBottomNav = false }: AppNavbarPr
             {loggedIn ? (
               <button
                 onClick={() => setUserMenuOpen(!userMenuOpen)}
+                aria-label="사용자 메뉴"
+                aria-expanded={userMenuOpen}
                 className="w-8 h-8 rounded-full bg-gradient-to-br from-indigo-500 to-violet-600 flex items-center justify-center text-white text-xs font-bold cursor-pointer"
               >
                 {avatarLetter}

@@ -1,4 +1,5 @@
 import { useState, useEffect, useCallback, useRef, useMemo } from 'react';
+import { logDev } from '@/lib/logger';
 import { tvcTemplates, TvcTemplate } from '@/mocks/tvcSamples';
 import AdSidebar from './AdSidebar';
 import TemplateCard from './TemplateCard';
@@ -348,7 +349,7 @@ export default function AdPage() {
         return;
       }
 
-      console.log(`[AdPage] loadMyWorks: ${data?.length ?? 0}개 로드됨`);
+      logDev(`[AdPage] loadMyWorks: ${data?.length ?? 0}개 로드됨`);
 
       const loaded: MyWorkItem[] = (data ?? [])
         .filter((row) => row.result_url && row.result_url !== 'https://example.com/test.jpg') // 테스트 더미 제외

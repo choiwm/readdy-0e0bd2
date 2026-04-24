@@ -1,6 +1,7 @@
 import { useState, useRef, useCallback, useEffect } from 'react';
 import PageHeader from '@/components/feature/PageHeader';
 import { supabase } from '@/lib/supabase';
+import { SUPABASE_URL, SUPABASE_ANON_KEY } from '@/lib/env';
 import { SoundCostKey } from '@/pages/ai-sound/hooks/useSoundCredits';
 
 // ─── Types ───────────────────────────────────────────────────────────────────
@@ -53,8 +54,6 @@ const steps: { key: SfxStep; label: string; desc: string; icon: string }[] = [
   { key: 'generating', label: 'SFX 생성',      desc: 'AI 사운드 합성 중...',       icon: 'ri-sparkling-2-line' },
   { key: 'mixing',     label: '믹싱 & 동기화', desc: '영상과 오디오 동기화 중...', icon: 'ri-equalizer-line'   },
 ];
-
-const SUPABASE_URL = import.meta.env.VITE_PUBLIC_SUPABASE_URL as string;
 
 // ─── SfxResultRow ─────────────────────────────────────────────────────────────
 
@@ -229,7 +228,7 @@ export default function SyncPanel({ onDeductCredits, credits = 999, onRefundCred
 
     const res = await fetch(`${SUPABASE_URL}/functions/v1/analyze-video-sfx`, {
       method: 'POST',
-      headers: { 'apikey': import.meta.env.VITE_PUBLIC_SUPABASE_ANON_KEY as string },
+      headers: { 'apikey': SUPABASE_ANON_KEY },
       body: form,
       signal: abortRef.current?.signal,
     });

@@ -17,7 +17,7 @@ export default function VideoPlayer({ posterSrc, cutId, onClose, isFullscreenMod
   const [volume, setVolume] = useState(0.8);
   const [isMuted, setIsMuted] = useState(false);
   const [showVolumeSlider, setShowVolumeSlider] = useState(false);
-  const [isFullscreen, setIsFullscreen] = useState(isFullscreenModal);
+  const [_isFullscreen, setIsFullscreen] = useState(isFullscreenModal);
   const [showControls, setShowControls] = useState(true);
   const [isDragging, setIsDragging] = useState(false);
   const [hoverTime, setHoverTime] = useState<number | null>(null);

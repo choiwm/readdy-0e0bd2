@@ -827,7 +827,6 @@ function LookSidebarPanel({
 
 // ── Character Sidebar Panel ────────────────────────────────────────────────
 const CHAR_CATEGORIES = ['전체', '비즈니스', '크리에이터', '패션', '스포츠', '라이프스타일', '아티스틱'] as const;
-type CharCategory = typeof CHAR_CATEGORIES[number];
 
 const CHAR_CATEGORY_ICONS: Record<string, string> = {
   '전체': 'ri-apps-2-line',

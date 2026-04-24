@@ -1,4 +1,5 @@
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
+import { requireUser, AuthFailure } from '../_shared/auth.ts';
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -130,6 +131,15 @@ function buildEmailHtml(params: {
 Deno.serve(async (req) => {
   if (req.method === 'OPTIONS') return new Response('ok', { headers: corsHeaders });
 
+  let authedUserId: string;
+  try {
+    const authed = await requireUser(req);
+    authedUserId = authed.id;
+  } catch (e) {
+    if (e instanceof AuthFailure) return e.response;
+    throw e;
+  }
+
   const supabase = createClient(
     Deno.env.get('SUPABASE_URL')!,
     Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!,
@@ -143,6 +153,7 @@ Deno.serve(async (req) => {
     if (req.method === 'POST' && action === 'check_and_send') {
       const body = await req.json();
       const { user_id, current_balance, max_balance } = body;
+      if (user_id && user_id !== authedUserId) return err('forbidden', 403);
 
       if (!user_id || current_balance === undefined) {
         return err('user_id and current_balance required');
@@ -274,6 +285,7 @@ Deno.serve(async (req) => {
     if (req.method === 'POST' && action === 'save_settings') {
       const body = await req.json();
       const { user_id, threshold_pct, threshold_amount, alert_on_pct, alert_on_amount, email_enabled, alert_cooldown_hours } = body;
+      if (user_id && user_id !== authedUserId) return err('forbidden', 403);
 
       if (!user_id) return err('user_id required');
 

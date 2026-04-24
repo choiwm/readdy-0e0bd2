@@ -1,4 +1,5 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
+import { logDev } from '@/lib/logger';
 import { supabase, GalleryItemDB } from '@/lib/supabase';
 import { GalleryItem, GalleryItemSource } from '@/mocks/galleryItems';
 
@@ -66,7 +67,7 @@ export function useGallery(userId?: string | null) {
         .update({ user_id: uid, session_id: sid })
         .eq('user_id', sid);
 
-      console.log(`[Gallery] Migrated ${sessionItems.length} items from session ${sid} to user ${uid}`);
+      logDev(`[Gallery] Migrated ${sessionItems.length} items from session ${sid} to user ${uid}`);
     } catch (e) {
       console.warn('[Gallery] Migration failed:', e);
     }

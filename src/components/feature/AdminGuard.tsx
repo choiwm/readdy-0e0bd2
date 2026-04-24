@@ -1,54 +1,63 @@
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { supabase } from '@/lib/supabase';
+import { SUPABASE_URL, SUPABASE_ANON_KEY } from '@/lib/env';
+import { logError } from '@/utils/errorHandler';
 
 interface AdminGuardProps {
   children: React.ReactNode;
 }
 
 type AuthState = 'checking' | 'authorized' | 'unauthorized';
-
-const SUPABASE_URL = import.meta.env.VITE_PUBLIC_SUPABASE_URL as string;
-const SUPABASE_ANON_KEY = import.meta.env.VITE_PUBLIC_SUPABASE_ANON_KEY as string;
-// supabase.ts의 storageKey와 동일하게 맞춤
 const STORAGE_KEY = 'sb-session';
 const TIMEOUT_MS = 15000;
+const REVALIDATE_MS = 5 * 60 * 1000; // 5분마다 서버 재검증
 
-function withTimeout<T>(promise: Promise<T>, ms: number): Promise<T> {
-  return Promise.race([
-    promise,
-    new Promise<T>((_, reject) =>
-      setTimeout(() => reject(new Error('timeout')), ms)
-    ),
-  ]);
+function withTimeout<T>(promise: Promise<T>, ms: number, signal?: AbortSignal): Promise<T> {
+  return new Promise<T>((resolve, reject) => {
+    const timer = setTimeout(() => reject(new Error('timeout')), ms);
+    const onAbort = () => {
+      clearTimeout(timer);
+      reject(new Error('aborted'));
+    };
+    signal?.addEventListener('abort', onAbort, { once: true });
+    promise.then(
+      (v) => {
+        clearTimeout(timer);
+        signal?.removeEventListener('abort', onAbort);
+        resolve(v);
+      },
+      (e) => {
+        clearTimeout(timer);
+        signal?.removeEventListener('abort', onAbort);
+        reject(e);
+      },
+    );
+  });
 }
 
 function getTokenFromStorage(): string | null {
   try {
-    // storageKey가 'sb-session'이므로 해당 키로 직접 접근
     const raw = localStorage.getItem(STORAGE_KEY);
     if (raw) {
       const parsed = JSON.parse(raw) as { access_token?: string };
       if (parsed.access_token) return parsed.access_token;
     }
-
     // 폴백: sb- 로 시작하는 모든 키 탐색
-    const keys = Object.keys(localStorage);
-    for (const key of keys) {
+    for (const key of Object.keys(localStorage)) {
       if (key.startsWith('sb-') && key.includes('auth')) {
         const val = localStorage.getItem(key);
-        if (val) {
-          try {
-            const p = JSON.parse(val) as { access_token?: string };
-            if (p.access_token) return p.access_token;
-          } catch {
-            // 무시
-          }
+        if (!val) continue;
+        try {
+          const p = JSON.parse(val) as { access_token?: string };
+          if (p.access_token) return p.access_token;
+        } catch (err) {
+          logError(err, { where: 'AdminGuard.getTokenFromStorage.parse', key }, 'warn');
         }
       }
     }
-  } catch {
-    // 무시
+  } catch (err) {
+    logError(err, { where: 'AdminGuard.getTokenFromStorage' }, 'warn');
   }
   return null;
 }
@@ -56,101 +65,87 @@ function getTokenFromStorage(): string | null {
 export default function AdminGuard({ children }: AdminGuardProps) {
   const navigate = useNavigate();
   const [authState, setAuthState] = useState<AuthState>('checking');
-  const checkedRef = useRef(false);
+  const abortRef = useRef<AbortController | null>(null);
+
+  const verifyAdmin = useCallback(async (signal: AbortSignal): Promise<'authorized' | 'unauthorized'> => {
+    let accessToken: string | null = null;
+
+    try {
+      const { data: { session } } = await withTimeout(
+        supabase.auth.getSession(),
+        TIMEOUT_MS,
+        signal,
+      );
+      accessToken = session?.access_token ?? null;
+    } catch (err) {
+      logError(err, { where: 'AdminGuard.getSession' }, 'warn');
+      accessToken = getTokenFromStorage();
+    }
+
+    if (!accessToken) return 'unauthorized';
+
+    try {
+      const resp = await fetch(`${SUPABASE_URL}/functions/v1/admin-stats?action=check_admin`, {
+        method: 'GET',
+        headers: {
+          Authorization: `Bearer ${accessToken}`,
+          'Content-Type': 'application/json',
+          apikey: SUPABASE_ANON_KEY,
+        },
+        signal,
+      });
+      if (!resp.ok) return 'unauthorized';
+      const result = (await resp.json()) as { is_admin?: boolean };
+      return result.is_admin === true ? 'authorized' : 'unauthorized';
+    } catch (err) {
+      if (signal.aborted) throw err;
+      logError(err, { where: 'AdminGuard.checkAdmin' }, 'error');
+      return 'unauthorized';
+    }
+  }, []);
 
   useEffect(() => {
-    // 중복 실행 방지
-    if (checkedRef.current) return;
-    checkedRef.current = true;
+    const controller = new AbortController();
+    abortRef.current = controller;
+    let timer: ReturnType<typeof setInterval> | null = null;
 
-    let mounted = true;
-
-    const checkAdminAuth = async (): Promise<void> => {
+    const runCheck = async () => {
       try {
-        let accessToken: string | null = null;
-
-        // 1. SDK로 세션 가져오기 (타임아웃 15초)
-        try {
-          const { data: { session } } = await withTimeout(
-            supabase.auth.getSession(),
-            TIMEOUT_MS
-          );
-          accessToken = session?.access_token ?? null;
-        } catch {
-          // SDK 타임아웃 → localStorage에서 직접 추출
-          accessToken = getTokenFromStorage();
-        }
-
-        if (!accessToken) {
-          if (mounted) {
-            setAuthState('unauthorized');
-            navigate('/admin-login', { replace: true });
-          }
-          return;
-        }
-
-        // 2. Edge Function으로 관리자 권한 확인
-        let isAdmin = false;
-        try {
-          const resp = await withTimeout(
-            fetch(`${SUPABASE_URL}/functions/v1/admin-stats?action=check_admin`, {
-              method: 'GET',
-              headers: {
-                Authorization: `Bearer ${accessToken}`,
-                'Content-Type': 'application/json',
-                apikey: SUPABASE_ANON_KEY,
-              },
-            }),
-            TIMEOUT_MS
-          );
-
-          if (resp.ok) {
-            const result = await resp.json() as { is_admin: boolean };
-            isAdmin = result.is_admin === true;
-          }
-        } catch {
-          // Edge Function 타임아웃/실패 → 로그인 페이지로
-          if (mounted) {
-            setAuthState('unauthorized');
-            navigate('/admin-login', { replace: true });
-          }
-          return;
-        }
-
-        if (!isAdmin) {
-          await supabase.auth.signOut();
-          if (mounted) {
-            setAuthState('unauthorized');
-            navigate('/admin-login', { replace: true });
-          }
-          return;
-        }
-
-        if (mounted) {
+        const next = await verifyAdmin(controller.signal);
+        if (controller.signal.aborted) return;
+        if (next === 'authorized') {
           setAuthState('authorized');
-        }
-      } catch {
-        if (mounted) {
+        } else {
           setAuthState('unauthorized');
+          try { await supabase.auth.signOut(); } catch (err) {
+            logError(err, { where: 'AdminGuard.signOut' }, 'warn');
+          }
           navigate('/admin-login', { replace: true });
         }
+      } catch (err) {
+        if (controller.signal.aborted) return;
+        logError(err, { where: 'AdminGuard.runCheck' }, 'error');
+        setAuthState('unauthorized');
+        navigate('/admin-login', { replace: true });
       }
     };
 
-    checkAdminAuth();
+    runCheck();
+    timer = setInterval(runCheck, REVALIDATE_MS);
 
     const { data: { subscription } } = supabase.auth.onAuthStateChange((event) => {
-      if (event === 'SIGNED_OUT' && mounted) {
+      if (event === 'SIGNED_OUT' && !controller.signal.aborted) {
         setAuthState('unauthorized');
         navigate('/admin-login', { replace: true });
       }
     });
 
     return () => {
-      mounted = false;
+      controller.abort();
+      if (timer) clearInterval(timer);
       subscription.unsubscribe();
     };
-  }, [navigate]);
+  }, [navigate, verifyAdmin]);
 
   if (authState === 'checking') {
     return (

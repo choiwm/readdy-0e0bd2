@@ -1,4 +1,5 @@
 import { useState, useEffect, useRef, useMemo, useCallback } from 'react';
+import { logDev } from '@/lib/logger';
 import type { AppliedCharacter } from '../page';
 import { buildCharacterPrompt, buildAnglePrompt, buildLookPrompt, getCharacterAppearanceTags, type AppliedAngle, type AppliedLook } from '@/utils/characterPrompt';
 import { LOOK_OPTIONS } from '@/pages/ai-create/data/presets';
@@ -47,7 +48,7 @@ const MODEL_DEFS: ModelDef[] = [
   },
 ];
 
-const models = MODEL_DEFS.map((m) => m.id);
+const _models = MODEL_DEFS.map((m) => m.id);
 const ratios = ['1K · 16:9 · PNG', '4K · 1:1 · PNG', '2K · 9:16 · PNG'];
 const tabs = ['IMAGE', 'VIDEO', 'AVATAR', 'MODIFY'];
 
@@ -467,9 +468,9 @@ export default function PromptBar({
   const [showComingSoonToast, setShowComingSoonToast] = useState(false);
   const prevCounterRef = useRef<number>(0);
 
-  const { credits, deduct, canAfford, maxCredits, isLoggedIn } = useCredits();
+  const { credits, deduct: _deduct, canAfford: _canAfford, maxCredits: _maxCredits, isLoggedIn } = useCredits();
   // [DEBUG] 크레딧 강제 우회: 크레딧 0이어도 항상 생성 가능하게 테스트
-  const debugCredits = Math.max(credits, 999);
+  const _debugCredits = Math.max(credits, 999);
 
   // 현재 선택된 모델 + 타입의 생성 비용
   const currentCost = useMemo(() => getCost(selectedModel, activeTab), [selectedModel, activeTab]);
@@ -530,7 +531,7 @@ export default function PromptBar({
       return;
     }
     // [DEBUG] 크레딧 체크 완전 제거 - Edge Function이 처리
-    console.log('[PromptBar] handleGenerate 호출:', { model: selectedModel, type: activeTab, ratio: selectedRatio, promptLen: finalPrompt.length });
+    logDev('[PromptBar] handleGenerate 호출:', { model: selectedModel, type: activeTab, ratio: selectedRatio, promptLen: finalPrompt.length });
     if (onGenerate) onGenerate(finalPrompt || '상상하는 장면을 묘사해보세요...', selectedModel, activeTab, selectedRatio, currentCost);
     setShowPreview(false);
   };

@@ -1,4 +1,5 @@
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
+import { requireAdmin, AuthFailure, writeAuditLog, type AuthedAdmin } from '../_shared/auth.ts';
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -7,6 +8,14 @@ const corsHeaders = {
 
 Deno.serve(async (req) => {
   if (req.method === 'OPTIONS') return new Response('ok', { headers: corsHeaders });
+
+  let admin: AuthedAdmin;
+  try {
+    admin = await requireAdmin(req);
+  } catch (e) {
+    if (e instanceof AuthFailure) return e.response;
+    throw e;
+  }
 
   const supabase = createClient(
     Deno.env.get('SUPABASE_URL')!,
@@ -246,13 +255,10 @@ Deno.serve(async (req) => {
         });
       }
 
-      await supabase.from('audit_logs').insert({
-        admin_email: 'admin',
-        action: '팀 생성',
+      await writeAuditLog(supabase, admin, '팀 생성', {
         target_type: 'team',
         target_id: team?.id ?? '',
         target_label: name,
-        result: 'success',
       });
 
       return new Response(JSON.stringify({ team }), {

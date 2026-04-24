@@ -1,4 +1,5 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
+import { getAuthorizationHeader } from '@/lib/env';
 
 // ── Types ─────────────────────────────────────────────────────────────────
 interface FalModelMetadata {
@@ -72,7 +73,6 @@ function getCategoryIcon(category: string): string {
 }
 
 const SUPABASE_URL = import.meta.env.VITE_PUBLIC_SUPABASE_URL;
-const ANON_KEY = import.meta.env.VITE_PUBLIC_SUPABASE_ANON_KEY;
 const BASE_URL = `${SUPABASE_URL}/functions/v1/fal-model-catalog`;
 
 const KNOWN_CATEGORIES = [
@@ -149,7 +149,7 @@ export default function FalModelCatalog({ isDark, onToast, onSelectModel }: Prop
       if (isLoadMore && cursor) params.set('cursor', cursor);
 
       const res = await fetch(`${BASE_URL}?${params.toString()}`, {
-        headers: { 'Authorization': `Bearer ${ANON_KEY}` },
+        headers: { 'Authorization': getAuthorizationHeader() },
       });
 
       if (!res.ok) throw new Error(`HTTP ${res.status}`);
@@ -195,7 +195,7 @@ export default function FalModelCatalog({ isDark, onToast, onSelectModel }: Prop
       if (debouncedQ) params.set('q', debouncedQ);
 
       const res = await fetch(`${BASE_URL}?${params.toString()}`, {
-        headers: { 'Authorization': `Bearer ${ANON_KEY}` },
+        headers: { 'Authorization': getAuthorizationHeader() },
       });
 
       if (!res.ok) throw new Error(`HTTP ${res.status}`);
@@ -241,7 +241,7 @@ export default function FalModelCatalog({ isDark, onToast, onSelectModel }: Prop
       const res = await fetch(`${BASE_URL}?action=validate`, {
         method: 'POST',
         headers: {
-          'Authorization': `Bearer ${ANON_KEY}`,
+          'Authorization': getAuthorizationHeader(),
           'Content-Type': 'application/json',
         },
         body: JSON.stringify({ endpoint_ids: currentModelIds }),
@@ -264,7 +264,7 @@ export default function FalModelCatalog({ isDark, onToast, onSelectModel }: Prop
   // ── 초기 로드 ──
   useEffect(() => {
     loadAll();
-  }, []);
+  }, [loadAll]);
 
   // ── 필터 변경 시 재로드 ──
   useEffect(() => {
@@ -273,7 +273,7 @@ export default function FalModelCatalog({ isDark, onToast, onSelectModel }: Prop
     } else {
       loadAll();
     }
-  }, [debouncedQ, selectedCategory]);
+  }, [debouncedQ, selectedCategory, loadAll, loadModels]);
 
   // ── 모델을 서비스에 적용 ──
   const handleApplyModel = (model: FalModel) => {

@@ -1,7 +1,9 @@
 import { useState, useEffect, useCallback } from 'react';
+import { logDev } from '@/lib/logger';
 import PgCronPanel from './PgCronPanel';
 import EmailAlertPanel from './EmailAlertPanel';
 import SlackAlertPanel from './SlackAlertPanel';
+import { getAuthorizationHeader } from '@/lib/env';
 
 interface ScheduleRow {
   service_slug: string;
@@ -174,6 +176,8 @@ function RunResultDropdown({
   );
 }
 
+const SCHEDULER_BASE = `${import.meta.env.VITE_PUBLIC_SUPABASE_URL}/functions/v1/healthcheck-scheduler`;
+
 // ── 메인 컴포넌트 ─────────────────────────────────────────────────────────────
 export default function HealthCheckScheduler({ isDark, onToast }: Props) {
   const [schedules, setSchedules] = useState<ScheduleRow[]>([]);
@@ -186,11 +190,6 @@ export default function HealthCheckScheduler({ isDark, onToast }: Props) {
   const [savingSlug, setSavingSlug] = useState<string | null>(null);
   const [expanded, setExpanded] = useState(false);
   const [viewMode, setViewMode] = useState<'manual' | 'pgcron' | 'email' | 'slack'>('manual');
-
-  const SUPABASE_URL = import.meta.env.VITE_PUBLIC_SUPABASE_URL;
-  const ANON_KEY = import.meta.env.VITE_PUBLIC_SUPABASE_ANON_KEY;
-  const headers = { 'Authorization': `Bearer ${ANON_KEY}` };
-  const schedulerBase = `${SUPABASE_URL}/functions/v1/healthcheck-scheduler`;
 
   const t = {
     cardBg:    isDark ? 'bg-[#0f0f13]'         : 'bg-white',
@@ -209,8 +208,8 @@ export default function HealthCheckScheduler({ isDark, onToast }: Props) {
     setLoading(true);
     try {
       const [schedRes, logsRes] = await Promise.allSettled([
-        fetch(`${schedulerBase}?action=get_schedule`, { headers }),
-        fetch(`${schedulerBase}?action=get_logs&limit=10`, { headers }),
+        fetch(`${SCHEDULER_BASE}?action=get_schedule`, { headers: { Authorization: getAuthorizationHeader() } }),
+        fetch(`${SCHEDULER_BASE}?action=get_logs&limit=10`, { headers: { Authorization: getAuthorizationHeader() } }),
       ]);
       if (schedRes.status === 'fulfilled') {
         const data = await schedRes.value.json();
@@ -233,9 +232,9 @@ export default function HealthCheckScheduler({ isDark, onToast }: Props) {
   const handleToggle = async (slug: string, enabled: boolean) => {
     setSavingSlug(slug);
     try {
-      await fetch(`${schedulerBase}?action=update_schedule`, {
+      await fetch(`${SCHEDULER_BASE}?action=update_schedule`, {
         method: 'PATCH',
-        headers: { ...headers, 'Content-Type': 'application/json' },
+        headers: { Authorization: getAuthorizationHeader(), 'Content-Type': 'application/json' },
         body: JSON.stringify({ service_slug: slug, healthcheck_enabled: enabled }),
       });
       setSchedules((prev) => prev.map((s) => s.service_slug === slug ? { ...s, healthcheck_enabled: enabled } : s));
@@ -250,9 +249,9 @@ export default function HealthCheckScheduler({ isDark, onToast }: Props) {
   const handleIntervalChange = async (slug: string, intervalMin: number) => {
     setSavingSlug(slug);
     try {
-      await fetch(`${schedulerBase}?action=update_schedule`, {
+      await fetch(`${SCHEDULER_BASE}?action=update_schedule`, {
         method: 'PATCH',
-        headers: { ...headers, 'Content-Type': 'application/json' },
+        headers: { Authorization: getAuthorizationHeader(), 'Content-Type': 'application/json' },
         body: JSON.stringify({ service_slug: slug, healthcheck_interval_min: intervalMin }),
       });
       setSchedules((prev) => prev.map((s) => s.service_slug === slug ? { ...s, healthcheck_interval_min: intervalMin } : s));
@@ -266,9 +265,9 @@ export default function HealthCheckScheduler({ isDark, onToast }: Props) {
   // 전체 일괄 설정
   const handleApplyAll = async (enabled: boolean) => {
     try {
-      await fetch(`${schedulerBase}?action=update_all_schedules`, {
+      await fetch(`${SCHEDULER_BASE}?action=update_all_schedules`, {
         method: 'PATCH',
-        headers: { ...headers, 'Content-Type': 'application/json' },
+        headers: { Authorization: getAuthorizationHeader(), 'Content-Type': 'application/json' },
         body: JSON.stringify({ healthcheck_enabled: enabled, healthcheck_interval_min: globalInterval }),
       });
       setSchedules((prev) => prev.map((s) => ({
@@ -286,9 +285,9 @@ export default function HealthCheckScheduler({ isDark, onToast }: Props) {
     setRunning(true);
     setRunResult(null);
     try {
-      const res = await fetch(`${schedulerBase}?action=run_manual`, {
+      const res = await fetch(`${SCHEDULER_BASE}?action=run_manual`, {
         method: 'POST',
-        headers: { ...headers, 'Content-Type': 'application/json' },
+        headers: { Authorization: getAuthorizationHeader(), 'Content-Type': 'application/json' },
         body: JSON.stringify({}),
       });
       const data: RunResult = await res.json();
@@ -306,9 +305,9 @@ export default function HealthCheckScheduler({ isDark, onToast }: Props) {
   const handleRunSingle = async (slug: string) => {
     setSavingSlug(slug);
     try {
-      const res = await fetch(`${schedulerBase}?action=run_manual&slug=${slug}`, {
+      const res = await fetch(`${SCHEDULER_BASE}?action=run_manual&slug=${slug}`, {
         method: 'POST',
-        headers: { ...headers, 'Content-Type': 'application/json' },
+        headers: { Authorization: getAuthorizationHeader(), 'Content-Type': 'application/json' },
         body: JSON.stringify({}),
       });
       const data = await res.json();
@@ -400,7 +399,7 @@ export default function HealthCheckScheduler({ isDark, onToast }: Props) {
       {viewMode === 'pgcron' && (
         <PgCronPanel
           isDark={isDark}
-          onToast={onToast ?? ((msg, type) => console.log(type, msg))}
+          onToast={onToast ?? ((msg, type) => logDev(type, msg))}
         />
       )}
 
@@ -408,7 +407,7 @@ export default function HealthCheckScheduler({ isDark, onToast }: Props) {
       {viewMode === 'email' && (
         <EmailAlertPanel
           isDark={isDark}
-          onToast={onToast ?? ((msg, type) => console.log(type, msg))}
+          onToast={onToast ?? ((msg, type) => logDev(type, msg))}
         />
       )}
 
@@ -416,7 +415,7 @@ export default function HealthCheckScheduler({ isDark, onToast }: Props) {
       {viewMode === 'slack' && (
         <SlackAlertPanel
           isDark={isDark}
-          onToast={onToast ?? ((msg, type) => console.log(type, msg))}
+          onToast={onToast ?? ((msg, type) => logDev(type, msg))}
         />
       )}
 

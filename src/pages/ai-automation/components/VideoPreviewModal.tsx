@@ -26,7 +26,7 @@ function formatViews(n: number): string {
   return String(n);
 }
 
-export default function VideoPreviewModal({ project, onClose, onEdit, onDuplicate, onDelete, onEditProject }: VideoPreviewModalProps) {
+export default function VideoPreviewModal({ project, onClose, onEdit, onDuplicate, onDelete, onEditProject: _onEditProject }: VideoPreviewModalProps) {
   const [isPlaying, setIsPlaying] = useState(false);
   const [progress, setProgress] = useState(0);
   const [currentTime, setCurrentTime] = useState(0);
