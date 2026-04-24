@@ -3,6 +3,7 @@ import ApiKeyModal from './ApiKeyModal';
 import CreditCostPanel from './CreditCostPanel';
 import CreditAlertPanel from './CreditAlertPanel';
 import HealthCheckScheduler from './HealthCheckScheduler';
+import DiagnosticHealthcheckPanel from './DiagnosticHealthcheckPanel';
 import FailureLogsDrawer from './FailureLogsDrawer';
 import FalModelCatalog from './FalModelCatalog';
 import FalKeyManagerPanel from './FalKeyManagerPanel';
@@ -48,7 +49,7 @@ export default function AiEngineTab({
   isDark, onToast, apiStatus, promptTemplates, onPromptToggle, onPromptEdit,
   apiHealthData, apiHealthLoading,
 }: Props) {
-  const [section, setSection] = useState<'model' | 'apikeys' | 'credits' | 'prompts' | 'gpu' | 'healthcheck' | 'catalog' | 'falkeys'>('model');
+  const [section, setSection] = useState<'model' | 'apikeys' | 'credits' | 'prompts' | 'gpu' | 'healthcheck' | 'catalog' | 'falkeys' | 'diagnostic'>('model');
   const [modelCategory, setModelCategory] = useState<'image' | 'video' | 'music'>('image');
 
   // Model settings
@@ -348,6 +349,7 @@ export default function AiEngineTab({
     { id: 'prompts' as const, label: '프롬프트 템플릿', icon: 'ri-code-s-slash-line',  color: 'text-violet-400',  bg: 'bg-violet-500/10',  activeBorder: 'border-violet-500/30' },
 
     { id: 'healthcheck' as const, label: '헬스체크 스케줄러', icon: 'ri-heart-pulse-line', color: 'text-rose-400',    bg: 'bg-rose-500/10',    activeBorder: 'border-rose-500/30' },
+    { id: 'diagnostic' as const,  label: 'fal.ai 통합 진단',  icon: 'ri-stethoscope-line', color: 'text-emerald-400', bg: 'bg-emerald-500/10', activeBorder: 'border-emerald-500/30' },
     { id: 'catalog' as const,     label: 'fal.ai 모델 카탈로그', icon: 'ri-apps-2-line',        color: 'text-teal-400',    bg: 'bg-teal-500/10',    activeBorder: 'border-teal-500/30' },
     { id: 'falkeys' as const,     label: 'fal.ai 키 관리',      icon: 'ri-shield-keyhole-line', color: 'text-cyan-400',    bg: 'bg-cyan-500/10',    activeBorder: 'border-cyan-500/30' },
   ];
@@ -1264,6 +1266,13 @@ export default function AiEngineTab({
       ══════════════════════════════════════════════════════════════ */}
       {section === 'healthcheck' && (
         <HealthCheckScheduler isDark={isDark} onToast={onToast} />
+      )}
+
+      {/* ══════════════════════════════════════════════════════════════
+          SECTION: fal.ai 통합 진단 (end-to-end probe)
+      ══════════════════════════════════════════════════════════════ */}
+      {section === 'diagnostic' && (
+        <DiagnosticHealthcheckPanel isDark={isDark} onToast={onToast} />
       )}
 
       {/* ══════════════════════════════════════════════════════════════
