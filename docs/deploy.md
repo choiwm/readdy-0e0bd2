@@ -9,6 +9,31 @@ Each job checks its required secrets/variables and **skips gracefully** with a
 notice if they're missing — so merging the workflow before secrets are
 configured is safe.
 
+## Quick start (recommended)
+
+Two interactive scripts walk through every required value, validate input, and
+write secrets/variables for you. Both are idempotent — safe to re-run any time
+to add a missing one or rotate a key.
+
+```bash
+# 1) GitHub Actions Secrets/Variables (uses gh CLI)
+bash scripts/setup-deploy-secrets.sh
+
+# 2) Supabase Edge Function runtime secrets (uses supabase CLI)
+bash scripts/setup-supabase-secrets.sh
+
+# Audit only (non-interactive, exit 0 = all set):
+bash scripts/setup-deploy-secrets.sh --check
+bash scripts/setup-supabase-secrets.sh --check
+```
+
+After both scripts report green:
+
+```bash
+gh workflow run deploy.yml --ref main   # trigger immediately
+gh run watch                            # follow the run
+```
+
 ## Required GitHub configuration
 
 Settings → Secrets and variables → Actions.
@@ -32,9 +57,9 @@ Settings → Secrets and variables → Actions.
 | `PROD_VITE_PUBLIC_SUPABASE_ANON_KEY` | Frontend env at build time |
 | `PROD_VITE_PUBLIC_TOSS_CLIENT_KEY`   | `live_ck_xxx` for production, `test_ck_xxx` for staging |
 
-The Toss **secret** key and webhook secret are set via `supabase secrets set`
-(see `docs/payments-setup.md` step 3) — NOT GitHub Actions secrets, because
-they're read by the Edge Function runtime, not by `vite build`.
+The Toss **secret** key, webhook secret, and CORS allowlist are set via
+`supabase secrets set` (see `setup-supabase-secrets.sh`) — NOT GitHub Actions
+secrets, because they're read by the Edge Function runtime, not by `vite build`.
 
 ## First-time setup
 
@@ -46,14 +71,9 @@ supabase link --project-ref <SUPABASE_PROJECT_ID>
 # 2. Link Vercel locally (once) — creates .vercel/project.json
 vercel link
 
-# 3. Copy IDs to GitHub
-#    SUPABASE_PROJECT_ID  ← project-ref from step 1
-#    VERCEL_ORG_ID        ← orgId from .vercel/project.json
-#    VERCEL_PROJECT_ID    ← projectId from .vercel/project.json
-
-# 4. Set Toss secrets in Supabase (Edge Function env)
-supabase secrets set TOSS_SECRET_KEY=live_sk_xxx
-supabase secrets set TOSS_WEBHOOK_SECRET=$(openssl rand -hex 16)
+# 3. Run the setup scripts
+bash scripts/setup-deploy-secrets.sh
+bash scripts/setup-supabase-secrets.sh
 ```
 
 ## Runtime behavior
