@@ -6,6 +6,7 @@ import {
   VERIFIED_FAL_VIDEO_MODELS,
   resolveVideoModel,
 } from '../_shared/fal_video_models.ts';
+import { parseFalError as parseFalErrorShared, toClientPayload } from '../_shared/fal_errors.ts';
 
 // Build per-direction lookup tables from the canonical registry. This keeps
 // the wire format unchanged (frontend still sends "kling-v1" etc.) while
@@ -305,9 +306,16 @@ async function pollOnce(
 
       const corsH = {...corsHeaders,'Content-Type':'application/json'};
 
-      if (statusRes.status===401) return new Response(JSON.stringify({status:'FAILED',error:'fal.ai 인증 실패 (HTTP 401). API 키가 올바른지 확인하세요.',fal_error_type:'auth_error',retryable:false}),{headers:corsH});
-      if (statusRes.status===403) return new Response(JSON.stringify({status:'FAILED',error:'fal.ai 권한 없음 (HTTP 403). API 키의 scope를 확인하세요.',fal_error_type:'auth_error',retryable:false}),{headers:corsH});
-      if (statusRes.status===404) return new Response(JSON.stringify({status:'FAILED',error:'요청을 찾을 수 없습니다 (request_id 만료). 새로 생성해주세요.',fal_error_type:'not_found',retryable:false}),{headers:corsH});
+      if ([401, 402, 403, 404].includes(statusRes.status)) {
+        let parsedBody: Record<string, unknown> = {};
+        try { parsedBody = JSON.parse(statusText); } catch { /* ignore */ }
+        const parsed = parseFalErrorShared(statusRes.status, parsedBody, statusRes);
+        return new Response(JSON.stringify({
+          status: 'FAILED',
+          ...toClientPayload(parsed),
+          retryable: parsed.is_retryable,
+        }), { headers: corsH });
+      }
       if (statusRes.status===405) {
         console.error(`[generate-video:poll] 405 Method Not Allowed — URL: ${resolvedStatusUrl}`);
         return new Response(JSON.stringify({status:'FAILED',error:'fal.ai 폴링 URL 오류 (405). 새로 생성을 시도해주세요.',fal_error_type:'url_error',retryable:false}),{headers:corsH});
@@ -574,9 +582,22 @@ Deno.serve(async (req) => {
         return respond({error:errInfo.message,fal_error_type:errInfo.errorType,retryable:errInfo.isRetryable,model_errors:errInfo.modelErrors},422);
       }
 
-      const errMsg=falRes.status===401?'fal.ai 인증 실패 (HTTP 401). API 키가 올바른지 확인하세요.'
-        :falRes.status===403?'fal.ai 권한 없음 (HTTP 403). API 키의 scope를 확인하세요.'
-        :falRes.status===429?'fal.ai 대기열이 혼잡해요. 잠시 후 다시 시도해주세요.'
+      // Auth/payment/scope/not-found: surface centralised actionable message
+      // so admin sees specific next-step (key re-register vs billing setup vs
+      // wrong model id) rather than a generic auth message.
+      if ([401, 402, 403, 404].includes(falRes.status)) {
+        const sharedParsed = parseFalErrorShared(falRes.status, parsedErr, falRes);
+        await logUsage(supabase, {
+          userId: user_id as string | undefined,
+          sessionId: session_id as string | undefined,
+          action: `영상 생성 실패 (${falModel})`,
+          status: 'failed', creditsDeducted: 0,
+          metadata: { model: falModel, error: sharedParsed.message_kr, kind: sharedParsed.kind, http_status: falRes.status },
+        });
+        return respond(toClientPayload(sharedParsed), falRes.status);
+      }
+
+      const errMsg=falRes.status===429?'fal.ai 대기열이 혼잡해요. 잠시 후 다시 시도해주세요.'
         :getKoreanRequestErrorMessage(errorType,`fal.ai 오류 (HTTP ${falRes.status}): ${errInfo.message}`);
 
       await logUsage(supabase,{userId:user_id as string|undefined,sessionId:session_id as string|undefined,action:`영상 생성 실패 (${falModel})`,status:'failed',creditsDeducted:0,metadata:{model:falModel,error:errMsg,error_type:errorType,http_status:falRes.status}});
