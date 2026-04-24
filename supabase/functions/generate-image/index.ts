@@ -2,27 +2,11 @@ import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
 import { requireUser, AuthFailure } from '../_shared/auth.ts';
 import { buildCorsHeaders, handlePreflight } from '../_shared/cors.ts';
 import { checkRateLimit, rateLimitedResponse, POLICIES } from '../_shared/rateLimit.ts';
-
-const FAL_MODEL_MAP: Record<string, string> = {
-  "Flux Realism":    "fal-ai/flux/schnell",
-  "Flux Pro":        "fal-ai/flux-pro",
-  "Flux Pro Ultra":  "fal-ai/flux-pro/v1.1-ultra",
-  "Nano Banana 2":   "fal-ai/flux/schnell",
-  "Nano Banana 3":   "fal-ai/flux/dev",
-  "Ultra Banana":    "fal-ai/flux-pro/v1.1",
-  "Seedance 2.0":    "fal-ai/flux-pro/v1.1-ultra",
-  "Aurora V1 Pro":   "fal-ai/flux-pro/v1.1",
-  "FLUX 2":          "fal-ai/flux-pro/v1.1-ultra",
-  "Sora 2":          "fal-ai/flux-pro/v1.1-ultra",
-};
-
-const FAL_IMG2IMG_MODEL_MAP: Record<string, string> = {
-  "fal-ai/flux/schnell":         "fal-ai/flux/schnell/redux",
-  "fal-ai/flux/dev":             "fal-ai/flux/dev/image-to-image",
-  "fal-ai/flux-pro":             "fal-ai/flux-pro/v1/redux",
-  "fal-ai/flux-pro/v1.1":       "fal-ai/flux-pro/v1.1/redux",
-  "fal-ai/flux-pro/v1.1-ultra": "fal-ai/flux-pro/v1.1-ultra/redux",
-};
+import {
+  resolveImageModel,
+  DEFAULT_IMAGE_MODEL,
+  VERIFIED_FAL_IMAGE_MODELS,
+} from '../_shared/fal_image_models.ts';
 
 const CINEMATIC_SUFFIXES: Record<string, string> = {
   "Wide Shot":     "wide establishing shot, cinematic composition, dramatic lighting",
@@ -632,15 +616,31 @@ Deno.serve(async (req) => {
     let falModel: string;
 
     if (model_id) {
-      falModel = model_id;
-      if (useImageToImage && FAL_IMG2IMG_MODEL_MAP[falModel]) {
-        falModel = FAL_IMG2IMG_MODEL_MAP[falModel];
+      // Direct fal.ai path supplied (advanced flow). Map to i2i variant if
+      // we know one, otherwise use the path as-is and trust the caller.
+      const entry = VERIFIED_FAL_IMAGE_MODELS[model_id];
+      if (useImageToImage && entry?.i2i) {
+        falModel = entry.i2i;
+      } else {
+        falModel = model_id;
       }
     } else {
-      const baseModel = FAL_MODEL_MAP[model] ?? 'fal-ai/flux/schnell';
+      // Display name path. Resolve through the alias table and fall back to
+      // schnell with a warning if the name is unknown — this catches
+      // miswired frontends instead of silently returning Flux Realism for
+      // any string the client sends.
+      const resolved = resolveImageModel(model);
+      if (!resolved) {
+        console.warn(
+          `[generate-image] 알 수 없는 모델 이름: "${model}" — 기본 ${DEFAULT_IMAGE_MODEL.id}로 폴백.`
+          + ' src/pages/ai-create/components/PromptBar.tsx의 모델 목록과'
+          + ' supabase/functions/_shared/fal_image_models.ts의 IMAGE_MODEL_ALIASES를 확인하세요.'
+        );
+      }
+      const entry = resolved ?? DEFAULT_IMAGE_MODEL;
       falModel = useImageToImage
-        ? (FAL_IMG2IMG_MODEL_MAP[baseModel] ?? 'fal-ai/flux/dev/image-to-image')
-        : baseModel;
+        ? (entry.i2i ?? 'fal-ai/flux/dev/image-to-image')
+        : entry.id;
     }
 
     const isSchnell = falModel.includes('schnell') && !falModel.includes('redux');
