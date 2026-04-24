@@ -13,13 +13,17 @@ export default function Footer() {
     setError('');
     setSubmitting(true);
     try {
-      const body = new URLSearchParams();
-      body.append('email', email);
-      const res = await fetch('https://readdy.ai/api/form/d7d7n09noju8nk5a1650', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-        body: body.toString(),
-      });
+      const res = await fetch(
+        `${import.meta.env.VITE_PUBLIC_SUPABASE_URL}/functions/v1/support-submit`,
+        {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'apikey': import.meta.env.VITE_PUBLIC_SUPABASE_ANON_KEY,
+          },
+          body: JSON.stringify({ kind: 'newsletter', email }),
+        },
+      );
       if (res.ok) {
         setSubscribed(true);
         setEmail('');
@@ -152,12 +156,18 @@ export default function Footer() {
           </div>
         </div>
 
-        {/* Company Info */}
+        {/* Company Info — 전자상거래법 제10조 필수 표시 */}
         <div className="border-t border-white/[0.04] pt-6 md:pt-8 pb-4 md:pb-6 flex flex-col sm:flex-row sm:items-start sm:justify-between gap-4">
           <div className="text-[11px] text-gray-400 leading-relaxed space-y-0.5">
             <p className="font-bold text-gray-300">아이메타버스(주)</p>
+            <p>대표: 홍길동 · 사업자등록번호: 000-00-00000</p>
+            <p>통신판매업신고: 제0000-서울강남-00000호</p>
             <p>주소: 서울특별시 강남구 테헤란로 123</p>
+            <p>고객지원: 1588-0000 (평일 09:00–18:00)</p>
             <p>이메일: contact@aimetawow.com</p>
+            <p className="text-gray-500 mt-1">
+              호스팅 서비스: Supabase Inc. · Vercel Inc.
+            </p>
           </div>
           <div className="flex items-center gap-5">
             <Link

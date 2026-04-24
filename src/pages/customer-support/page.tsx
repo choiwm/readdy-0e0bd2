@@ -150,16 +150,23 @@ export default function CustomerSupportPage() {
     setSubmitting(true);
     setSubmitStatus('idle');
     try {
-      const body = new URLSearchParams();
-      body.append('name', formData.name);
-      body.append('email', formData.email);
-      body.append('type', formData.type);
-      body.append('message', formData.message);
-      const res = await fetch('https://readdy.ai/api/form/d7eo1aj5bqmofchk7l1g', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-        body: body.toString(),
-      });
+      const res = await fetch(
+        `${import.meta.env.VITE_PUBLIC_SUPABASE_URL}/functions/v1/support-submit`,
+        {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'apikey': import.meta.env.VITE_PUBLIC_SUPABASE_ANON_KEY,
+          },
+          body: JSON.stringify({
+            kind: 'inquiry',
+            name: formData.name,
+            email: formData.email,
+            subject: formData.type || '일반 문의',
+            message: formData.message,
+          }),
+        },
+      );
       if (res.ok) {
         setSubmitStatus('success');
         setFormData({ name: '', email: '', type: '', message: '' });

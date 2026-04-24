@@ -421,17 +421,23 @@ function ProUpgradeModal({ onClose }: { onClose: () => void }) {
 
     setIsSubmitting(true);
     try {
-      const formData = new URLSearchParams();
-      formData.append('name', name.trim());
-      formData.append('email', email.trim());
-      formData.append('plan', `Pro ${billing === 'yearly' ? '연간' : '월간'} ($${price}/월)`);
-      formData.append('message', `Pro 플랜 업그레이드를 원합니다.`);
-
-      await fetch('https://readdy.ai/api/form/d7hq3r0i2k4pviviqnpg', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-        body: formData.toString(),
-      });
+      await fetch(
+        `${import.meta.env.VITE_PUBLIC_SUPABASE_URL}/functions/v1/support-submit`,
+        {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'apikey': import.meta.env.VITE_PUBLIC_SUPABASE_ANON_KEY,
+          },
+          body: JSON.stringify({
+            kind: 'plan_upgrade',
+            name: name.trim(),
+            email: email.trim(),
+            subject: `Pro ${billing === 'yearly' ? '연간' : '월간'} ($${price}/월) 업그레이드 문의`,
+            message: `Pro 플랜 업그레이드를 원합니다.\n\n이름: ${name.trim()}\n이메일: ${email.trim()}\n요금제: Pro ${billing === 'yearly' ? '연간' : '월간'} ($${price}/월)`,
+          }),
+        },
+      );
       setIsSubmitting(false);
       setSubmitted(true);
     } catch {
