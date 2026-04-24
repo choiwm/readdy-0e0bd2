@@ -7,6 +7,7 @@ import {
   DEFAULT_IMAGE_MODEL,
   VERIFIED_FAL_IMAGE_MODELS,
 } from '../_shared/fal_image_models.ts';
+import { parseFalError, toClientPayload } from '../_shared/fal_errors.ts';
 
 const CINEMATIC_SUFFIXES: Record<string, string> = {
   "Wide Shot":     "wide establishing shot, cinematic composition, dramatic lighting",
@@ -377,25 +378,14 @@ async function handlePollMode(
 
       const corsH = { ...corsHeaders, 'Content-Type': 'application/json' };
 
-      if (statusRes.status === 401) {
+      if ([401, 402, 403, 404].includes(statusRes.status)) {
+        let parsedBody: Record<string, unknown> = {};
+        try { parsedBody = JSON.parse(statusText); } catch { /* ignore */ }
+        const parsed = parseFalError(statusRes.status, parsedBody, statusRes);
         return new Response(JSON.stringify({
           status: 'FAILED',
-          error: 'fal.ai 인증 실패 (HTTP 401). API 키를 확인하세요.',
-          retryable: false,
-        }), { headers: corsH });
-      }
-      if (statusRes.status === 403) {
-        return new Response(JSON.stringify({
-          status: 'FAILED',
-          error: 'fal.ai 권한 없음 (HTTP 403). API 키의 scope를 확인하세요.',
-          retryable: false,
-        }), { headers: corsH });
-      }
-      if (statusRes.status === 404) {
-        return new Response(JSON.stringify({
-          status: 'FAILED',
-          error: '요청을 찾을 수 없어요. 새로 생성해주세요.',
-          retryable: false,
+          ...toClientPayload(parsed),
+          retryable: parsed.is_retryable,
         }), { headers: corsH });
       }
       if (statusRes.status === 405) {
@@ -726,8 +716,14 @@ Deno.serve(async (req) => {
       const resText = await res.text();
       console.log(`[generate-image] schnell HTTP ${res.status}: ${resText.slice(0, 300)}`);
 
-      if (res.status === 401) return respond({ error: 'fal.ai 인증 실패 (HTTP 401). API 키를 확인하세요.' }, 401);
-      if (res.status === 403) return respond({ error: 'fal.ai 권한 없음 (HTTP 403). API scope 키를 사용해주세요.' }, 403);
+      // Auth/payment/scope failures: surface the centralised actionable
+      // message so the admin sees "결제 등록 필요" vs "키 재발급 필요".
+      if ([401, 402, 403, 404].includes(res.status)) {
+        let parsedBody: Record<string, unknown> = {};
+        try { parsedBody = JSON.parse(resText); } catch { /* ignore */ }
+        const parsed = parseFalError(res.status, parsedBody, res);
+        return respond(toClientPayload(parsed), res.status);
+      }
 
       if (res.ok) {
         let data: Record<string, unknown> = {};
@@ -801,8 +797,12 @@ Deno.serve(async (req) => {
     if (queueFalReqId) console.log(`[generate-image] queue x-fal-request-id: ${queueFalReqId}`);
     console.log(`[generate-image] Queue HTTP ${queueRes.status}: ${queueText.slice(0, 400)}`);
 
-    if (queueRes.status === 401) return respond({ error: 'fal.ai 인증 실패 (HTTP 401). API 키를 확인하세요.' }, 401);
-    if (queueRes.status === 403) return respond({ error: 'fal.ai 권한 없음 (HTTP 403). API scope 키를 사용해주세요.' }, 403);
+    if ([401, 402, 403, 404].includes(queueRes.status)) {
+      let parsedBody: Record<string, unknown> = {};
+      try { parsedBody = JSON.parse(queueText); } catch { /* ignore */ }
+      const parsed = parseFalError(queueRes.status, parsedBody, queueRes);
+      return respond(toClientPayload(parsed), queueRes.status);
+    }
 
     if (!queueRes.ok) {
       let errBody: Record<string, unknown> = {};
