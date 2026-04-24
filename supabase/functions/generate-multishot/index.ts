@@ -139,11 +139,14 @@ function checkNsfw(data: Record<string, unknown>): boolean {
 
 /**
  * fal.ai queue status 폴링
- * 공식 문서 적용:
- *   - POST 응답의 status_url 우선 사용
- *   - 없으면 /status suffix 방식 조립
- *   - 401/403 → 인증 오류 명시적 처리
- *   - X-Fal-Error-Type 헤더 수집
+ *
+ * Reference: https://fal.ai/docs/model-api-reference#queue-api
+ *   - POST 응답의 status_url을 우선 사용 (가장 정확)
+ *   - 없으면 GET https://queue.fal.run/<model>/requests/<id>
+ *
+ * ⚠️ /status suffix는 fal.ai가 지원하지 않음 (405 Method Not Allowed).
+ *    이전에 이 함수가 /status suffix를 사용해 multishot 워크플로 전체가
+ *    "URL 오류"로 실패했음 — bug fixed.
  */
 async function pollFalStatus(
   falKey: string,
@@ -154,9 +157,8 @@ async function pollFalStatus(
   const candidates = statusUrlFromPost
     ? [statusUrlFromPost]
     : [
-        `https://queue.fal.run/${modelPath}/requests/${requestId}/status`,
-        `https://queue.fal.run/${modelPath}/requests/${requestId}/status?logs=1`,
-        `https://fal.run/${modelPath}/requests/${requestId}/status`,
+        `https://queue.fal.run/${modelPath}/requests/${requestId}`,
+        `https://queue.fal.run/${modelPath}/requests/${requestId}?logs=1`,
       ];
 
   let lastStatus = 0;

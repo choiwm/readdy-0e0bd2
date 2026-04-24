@@ -241,8 +241,10 @@ Deno.serve(async (req) => {
       if (!FAL_KEY) return respond({ error: "API 키 없음" }, 500);
 
       const requestId = body.request_id as string;
-      // 공식 문서: POST 응답에서 받은 status_url / response_url 우선 사용
-      const statusUrl = (body.status_url as string | undefined) ?? `https://queue.fal.run/${VTON_WORKFLOW_MODEL_ID}/requests/${requestId}/status`;
+      // 공식 문서: POST 응답에서 받은 status_url / response_url을 우선 사용.
+      // fal.ai Queue API: status는 GET /requests/<id> (NO /status suffix — 405 발생).
+      // Reference: https://fal.ai/docs/model-api-reference#queue-api
+      const statusUrl = (body.status_url as string | undefined) ?? `https://queue.fal.run/${VTON_WORKFLOW_MODEL_ID}/requests/${requestId}`;
       const responseUrl = (body.response_url as string | undefined) ?? `https://queue.fal.run/${VTON_WORKFLOW_MODEL_ID}/requests/${requestId}/response`;
 
       if (!body.status_url) {
@@ -448,8 +450,9 @@ Deno.serve(async (req) => {
       await new Promise((r) => setTimeout(r, pollInterval));
 
       try {
-        // 공식 문서: status_url 우선 사용
-        const resolvedStatusUrl = statusUrl ?? `https://queue.fal.run/${VTON_WORKFLOW_MODEL_ID}/requests/${requestId}/status`;
+        // 공식 문서: POST 응답 status_url 우선 사용. fallback도 /status suffix 없이 — fal.ai는
+        // GET /requests/<id> 를 사용하며 /status suffix는 405 반환.
+        const resolvedStatusUrl = statusUrl ?? `https://queue.fal.run/${VTON_WORKFLOW_MODEL_ID}/requests/${requestId}`;
         const statusRes = await fetch(resolvedStatusUrl, {
           headers: { "Authorization": `Key ${FAL_KEY}` },
           signal: AbortSignal.timeout(10000),

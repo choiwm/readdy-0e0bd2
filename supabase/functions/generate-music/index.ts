@@ -348,7 +348,7 @@ async function generateWithFalQueue(
   for (let i = 0; i < 50; i++) {
     await new Promise((r) => setTimeout(r, 2000));
     try {
-      const resolvedStatusUrl = statusUrl ?? `https://queue.fal.run/${model}/requests/${requestId}/status`;
+      const resolvedStatusUrl = statusUrl ?? `https://queue.fal.run/${model}/requests/${requestId}`;
       const statusRes = await fetch(resolvedStatusUrl, {
         headers: { 'Authorization': `Key ${falKey}` },
         signal: AbortSignal.timeout(8000),
