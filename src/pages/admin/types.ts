@@ -26,6 +26,10 @@ export interface User {
   projects: number;
 }
 
+export interface UserRecord extends User {
+  memberGrade: string;
+}
+
 export interface ContentItem {
   id: string;
   title: string;

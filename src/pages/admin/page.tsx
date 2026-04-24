@@ -10,9 +10,11 @@ import AuditAlertSettingsModal, { type AuditAlertRule } from './components/Audit
 import AiEngineTab from './components/AiEngineTab';
 import TeamManageModal from './components/TeamManageModal';
 import CreditGrantPanel from './components/CreditGrantPanel';
-import type { CsTicket, Notice, PromptTemplate, AdminAccount, TeamRecord } from './types';
+import UserDetailModal from './components/UserDetailModal';
+import CouponCreateModal from './components/CouponCreateModal';
+import AddAdminModal from './components/AddAdminModal';
+import type { CsTicket, Notice, PromptTemplate, AdminAccount, TeamRecord, UserRecord, UserStatus } from './types';
 import { apiStatus, contentTrends, dailySignups, planDist, auditLogs } from './mockData';
-import { StatusBadge, PlanBadge } from './components/Badges';
 import NotificationPanel, { type Notification, initialNotifications } from './components/NotificationPanel';
 import { GradeBadge, GRADE_META } from './components/AdminHelpers';
 import GradeSettingsTab from './components/GradeSettingsTab';
@@ -36,139 +38,18 @@ import { useAdminContent } from './hooks/useAdminContent';
 import { useAdminAiEngine } from './hooks/useAdminAiEngine';
 import { useAdminSecurity } from './hooks/useAdminSecurity';
 import { useAdminSysSettings } from './hooks/useAdminSysSettings';
-import { getAuthorizationHeader } from '@/lib/env';
+import { useAdminTheme } from './hooks/useAdminTheme';
+import {
+  ticketStatusChange as apiTicketStatusChange,
+  noticeSave as apiNoticeSave,
+  noticeDelete as apiNoticeDelete,
+  sendPushMail as apiSendPushMail,
+  paymentRefund as apiPaymentRefund,
+  savePermissions as apiSavePermissions,
+} from './hooks/useAdminActions';
 
 // ── Types ──────────────────────────────────────────────────────────────────
 type TabType = 'overview' | 'users' | 'coin-grant' | 'content' | 'ai-engine' | 'billing' | 'cs' | 'cs-notice' | 'audit' | 'sys-settings' | 'security' | 'grade-settings';
-type UserStatus = 'active' | 'inactive' | 'suspended';
-
-
-// ── Mock Data (일부 실시간 불가 항목은 제거됨) ─────────────────────────────
-
-// 모든 목업 데이터 제거 완료 — 실제 DB 데이터만 사용
-
-// ── User 타입 정의 (DB 데이터 구조) ──────────────────────────────────────
-interface UserRecord {
-  id: string;
-  name: string;
-  email: string;
-  plan: string;
-  credits: number;
-  joined: string;
-  status: UserStatus;
-  lastLogin: string;
-  loginIp: string;
-  projects: number;
-  memberGrade: string;
-}
-
-// ── User Detail Modal ──────────────────────────────────────────────────────
-function UserDetailModal({ user, onClose, isDark, onCreditAdjust, onStatusChange }: {
-  user: UserRecord;
-  onClose: () => void;
-  isDark: boolean;
-  onCreditAdjust?: (userId: string, amount: string) => void;
-  onStatusChange?: (userId: string, status: UserStatus) => void;
-}) {
-  const [creditAdjust, setCreditAdjust] = useState('');
-  const m = {
-    bg:       isDark ? 'bg-[#0f0f13]'    : 'bg-white',
-    border:   isDark ? 'border-white/10' : 'border-gray-200',
-    borderSub:isDark ? 'border-white/5'  : 'border-gray-100',
-    text:     isDark ? 'text-white'      : 'text-slate-900',
-    textSub:  isDark ? 'text-zinc-300'   : 'text-slate-600',
-    textFaint:isDark ? 'text-zinc-500'   : 'text-slate-500',
-    cardBg:   isDark ? 'bg-zinc-900/60'  : 'bg-slate-50',
-    inputBg:  isDark ? 'bg-zinc-900 border-white/10 text-white placeholder-zinc-500' : 'bg-white border-slate-300 text-slate-900 placeholder-slate-400',
-    closeBtn: isDark ? 'text-zinc-400 hover:text-white' : 'text-slate-500 hover:text-slate-800',
-    cancelBtn:isDark ? 'bg-zinc-800 text-zinc-200 hover:bg-zinc-700' : 'bg-slate-100 text-slate-700 hover:bg-slate-200',
-    labelText:isDark ? 'text-zinc-400'   : 'text-slate-600',
-  };
-  return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
-      <div className="absolute inset-0 bg-black/70" onClick={onClose} />
-      <div className={`relative ${m.bg} border ${m.border} rounded-2xl w-full max-w-lg p-6 z-10`}>
-        <div className="flex items-center justify-between mb-5">
-          <h3 className={`text-base font-black ${m.text}`}>사용자 상세</h3>
-          <button onClick={onClose} className={`w-7 h-7 flex items-center justify-center ${m.closeBtn} cursor-pointer transition-colors`}>
-            <i className="ri-close-line text-lg" />
-          </button>
-        </div>
-        <div className={`flex items-center gap-4 mb-5 pb-5 border-b ${m.borderSub}`}>
-          <div className="w-14 h-14 rounded-full bg-gradient-to-br from-indigo-500/30 to-violet-500/30 border border-indigo-500/20 flex items-center justify-center flex-shrink-0">
-            <span className="text-xl font-black text-indigo-300">{user.name[0]}</span>
-          </div>
-          <div>
-            <p className={`text-base font-semibold ${m.text}`}>{user.name}</p>
-            <p className={`text-sm ${m.textSub}`}>{user.email}</p>
-            <div className="flex items-center gap-2 mt-1.5">
-              <PlanBadge plan={user.plan} isDark={isDark} />
-              <StatusBadge status={user.status} isDark={isDark} />
-            </div>
-          </div>
-        </div>
-        <div className="grid grid-cols-2 gap-3 mb-5">
-          {[
-            { label: '사용자 ID', value: user.id },
-            { label: '가입일', value: user.joined },
-            { label: '마지막 로그인', value: user.lastLogin },
-            { label: '접속 IP', value: user.loginIp },
-            { label: '총 프로젝트', value: `${user.projects}개` },
-            { label: '보유 크레딧', value: `${user.credits.toLocaleString()} CR` },
-          ].map((item) => (
-            <div key={item.label} className={`${m.cardBg} rounded-xl p-3`}>
-              <p className={`text-[10px] ${m.textFaint} mb-1`}>{item.label}</p>
-              <p className={`text-xs font-semibold ${m.text}`}>{item.value}</p>
-            </div>
-          ))}
-        </div>
-        <div className="mb-5">
-          <p className={`text-xs font-black ${m.labelText} mb-2`}>크레딧 수동 조정</p>
-          <div className="flex gap-2">
-            <input
-              type="number"
-              value={creditAdjust}
-              onChange={(e) => setCreditAdjust(e.target.value)}
-              placeholder="예: +500 또는 -200"
-              className={`flex-1 border rounded-xl px-3 py-2 text-sm focus:outline-none focus:border-indigo-500/50 ${m.inputBg}`}
-            />
-            <button
-              onClick={() => {
-                if (!creditAdjust.trim()) return;
-                onCreditAdjust?.(user.id, creditAdjust);
-                setCreditAdjust('');
-                onClose();
-              }}
-              className="px-4 py-2 bg-indigo-500 hover:bg-indigo-400 text-white text-xs font-bold rounded-xl cursor-pointer transition-colors whitespace-nowrap"
-            >
-              적용
-            </button>
-          </div>
-        </div>
-        <div className="flex gap-2">
-          {user.status === 'active' ? (
-            <button
-              onClick={() => { onStatusChange?.(user.id, 'suspended'); onClose(); }}
-              className={`flex-1 py-2.5 text-xs font-bold rounded-xl cursor-pointer transition-colors whitespace-nowrap border ${isDark ? 'bg-red-500/15 border-red-500/25 text-red-400 hover:bg-red-500/25' : 'bg-red-50 border-red-300 text-red-700 hover:bg-red-100'}`}
-            >
-              <i className="ri-forbid-line mr-1.5" />계정 정지
-            </button>
-          ) : (
-            <button
-              onClick={() => { onStatusChange?.(user.id, 'active'); onClose(); }}
-              className={`flex-1 py-2.5 text-xs font-bold rounded-xl cursor-pointer transition-colors whitespace-nowrap border ${isDark ? 'bg-emerald-500/15 border-emerald-500/25 text-emerald-400 hover:bg-emerald-500/25' : 'bg-emerald-50 border-emerald-300 text-emerald-700 hover:bg-emerald-100'}`}
-            >
-              <i className="ri-check-line mr-1.5" />계정 복구
-            </button>
-          )}
-          <button onClick={onClose} className={`flex-1 py-2.5 ${m.cancelBtn} text-xs font-bold rounded-xl cursor-pointer transition-colors whitespace-nowrap`}>
-            닫기
-          </button>
-        </div>
-      </div>
-    </div>
-  );
-}
 
 // ── Main ───────────────────────────────────────────────────────────────────
 export default function AdminPage() {
@@ -458,137 +339,23 @@ export default function AdminPage() {
 
   // CS: ticket reply + status change (Edge Function)
   const handleTicketStatusChange = async (ticketId: string, status: string, replyContent?: string) => {
-    try {
-      const url = new URL(`${import.meta.env.VITE_PUBLIC_SUPABASE_URL}/functions/v1/admin-cs`);
-
-      if (replyContent) {
-        url.searchParams.set('action', 'reply_ticket');
-        await fetch(url.toString(), {
-          method: 'POST',
-          headers: {
-            'Authorization': getAuthorizationHeader(),
-            'Content-Type': 'application/json',
-          },
-          body: JSON.stringify({ id: ticketId, reply_content: replyContent, new_status: status }),
-        });
-      } else {
-        url.searchParams.set('action', 'update_ticket_status');
-        await fetch(url.toString(), {
-          method: 'PATCH',
-          headers: {
-            'Authorization': getAuthorizationHeader(),
-            'Content-Type': 'application/json',
-          },
-          body: JSON.stringify({ id: ticketId, status }),
-        });
-      }
-
-      setCsTickets((prev) => prev.map((t) => t.id === ticketId ? { ...t, status } : t));
-      addToast(`티켓 ${ticketId} 상태가 변경됐습니다`, 'success');
-    } catch (e) {
-      console.warn('Ticket status update failed:', e);
-      setCsTickets((prev) => prev.map((t) => t.id === ticketId ? { ...t, status } : t));
-      addToast(`티켓 ${ticketId} 상태가 변경됐습니다`, 'success');
-    }
+    await apiTicketStatusChange(ticketId, status, replyContent);
+    setCsTickets((prev) => prev.map((t) => t.id === ticketId ? { ...t, status } : t));
+    addToast(`티켓 ${ticketId} 상태가 변경됐습니다`, 'success');
   };
 
-  // CS: notice save (Edge Function - create or update)
   const handleNoticeSave = async (notice: Notice) => {
-    try {
-      const url = new URL(`${import.meta.env.VITE_PUBLIC_SUPABASE_URL}/functions/v1/admin-cs`);
-      const isExisting = noticeList.some((n) => n.id === notice.id);
-
-      if (isExisting) {
-        url.searchParams.set('action', 'update_notice');
-        await fetch(url.toString(), {
-          method: 'PUT',
-          headers: {
-            'Authorization': getAuthorizationHeader(),
-            'Content-Type': 'application/json',
-          },
-          body: JSON.stringify({
-            id:       notice.id,
-            title:    notice.title,
-            category: notice.type,
-            status:   notice.status,
-          }),
-        });
-      } else {
-        url.searchParams.set('action', 'create_notice');
-        const res = await fetch(url.toString(), {
-          method: 'POST',
-          headers: {
-            'Authorization': getAuthorizationHeader(),
-            'Content-Type': 'application/json',
-          },
-          body: JSON.stringify({
-            title:    notice.title,
-            content:  notice.title,
-            category: notice.type,
-            status:   notice.status,
-          }),
-        });
-        const json = await res.json();
-        if (json.notice) {
-          notice = { ...notice, id: json.notice.id };
-        }
-      }
-
-      setNoticeList((prev) => {
-        const exists = prev.find((n) => n.id === notice.id);
-        if (exists) return prev.map((n) => n.id === notice.id ? notice : n);
-        return [notice, ...prev];
-      });
-      addToast(notice.status === 'published' ? '공지사항이 게시됐습니다' : '초안이 저장됐습니다', 'success');
-    } catch (e) {
-      console.warn('Notice save failed:', e);
-      setNoticeList((prev) => {
-        const exists = prev.find((n) => n.id === notice.id);
-        if (exists) return prev.map((n) => n.id === notice.id ? notice : n);
-        return [notice, ...prev];
-      });
-      addToast(notice.status === 'published' ? '공지사항이 게시됐습니다' : '초안이 저장됐습니다', 'success');
-    }
+    const saved = await apiNoticeSave(notice, noticeList, setNoticeList);
+    addToast(saved.status === 'published' ? '공지사항이 게시됐습니다' : '초안이 저장됐습니다', 'success');
   };
 
-  // CS: notice delete (Edge Function)
   const handleNoticeDelete = async (noticeId: string) => {
-    try {
-      const url = new URL(`${import.meta.env.VITE_PUBLIC_SUPABASE_URL}/functions/v1/admin-cs`);
-      url.searchParams.set('action', 'delete_notice');
-      url.searchParams.set('id', noticeId);
-      await fetch(url.toString(), {
-        method: 'DELETE',
-        headers: { 'Authorization': getAuthorizationHeader() },
-      });
-    } catch (e) {
-      console.warn('Notice delete failed:', e);
-    }
-    setNoticeList((prev) => prev.filter((n) => n.id !== noticeId));
+    await apiNoticeDelete(noticeId, setNoticeList);
     addToast('공지사항이 삭제됐습니다', 'info');
   };
 
-  // CS: push/email 발송 (Edge Function)
-  const handleSendPushMail = async (type: 'push' | 'email', payload: { subject?: string; message: string; target: string }) => {
-    try {
-      const url = new URL(`${import.meta.env.VITE_PUBLIC_SUPABASE_URL}/functions/v1/admin-cs`);
-      url.searchParams.set('action', type === 'email' ? 'send_email' : 'send_push');
-      await fetch(url.toString(), {
-        method: 'POST',
-        headers: {
-          'Authorization': getAuthorizationHeader(),
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          subject:     payload.subject,
-          message:     payload.message,
-          target_plan: payload.target,
-        }),
-      });
-    } catch (e) {
-      console.warn('Send push/mail failed:', e);
-    }
-  };
+  const handleSendPushMail = (type: 'push' | 'email', payload: { subject?: string; message: string; target: string }) =>
+    apiSendPushMail(type, payload);
 
   // CS: coupon toggle (hook 위임 + 토스트)
   const handleCouponToggle = async (code: string) => {
@@ -687,24 +454,7 @@ export default function AdminPage() {
 
   // Billing: refund (Edge Function)
   const handlePaymentRefund = async (payId: string) => {
-    try {
-      const url = new URL(`${import.meta.env.VITE_PUBLIC_SUPABASE_URL}/functions/v1/admin-billing`);
-      url.searchParams.set('action', 'refund_payment');
-      await fetch(url.toString(), {
-        method: 'POST',
-        headers: {
-          'Authorization': getAuthorizationHeader(),
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({ id: payId }),
-      });
-    } catch (e) {
-      console.warn('Refund failed:', e);
-    }
-    const displayPayments = paymentsData.length > 0 ? paymentsData : payments;
-    const updatedPayments = displayPayments.map((p) => p.id === payId ? { ...p, status: 'refunded' } : p);
-    if (paymentsData.length > 0) setPaymentsData(updatedPayments);
-    else setPayments(updatedPayments);
+    await apiPaymentRefund(payId, paymentsData, setPaymentsData, payments, setPayments);
     addToast(`${payId} 환불 처리됐습니다`, 'success');
   };
 
@@ -722,26 +472,7 @@ export default function AdminPage() {
 
   // Security: 관리자 권한 수정 → DB 반영
   const handleSavePermissions = async (adminId: string, adminName: string, permissions: string[]) => {
-    try {
-      const fetchUrl = new URL(`${import.meta.env.VITE_PUBLIC_SUPABASE_URL}/functions/v1/admin-security`);
-      fetchUrl.searchParams.set('action', 'update_admin');
-      await fetch(fetchUrl.toString(), {
-        method: 'PUT',
-        headers: {
-          'Authorization': getAuthorizationHeader(),
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({ id: adminId, permissions }),
-      });
-      // 로컬 state도 업데이트
-      setAdminAccounts((prev) => prev.map((a) => a.id === adminId ? { ...a, permissions } : a));
-      if (adminAccountsData.length > 0) {
-        setAdminAccountsData((prev) => prev.map((a) => a.id === adminId ? { ...a, permissions } : a));
-      }
-    } catch (e) {
-      console.warn('Permission update failed:', e);
-      setAdminAccounts((prev) => prev.map((a) => a.id === adminId ? { ...a, permissions } : a));
-    }
+    await apiSavePermissions(adminId, permissions, setAdminAccounts, adminAccountsData, setAdminAccountsData);
     addToast(`${adminName} 권한이 수정됐습니다`, 'success');
   };
 
@@ -931,29 +662,7 @@ export default function AdminPage() {
     auditPage * AUDIT_PAGE_SIZE,
   );
 
-  const t = {
-    bg:          isDark ? 'bg-[#09090c]'    : 'bg-slate-50',
-    headerBg:    isDark ? 'bg-[#0d0d10]'    : 'bg-white',
-    sidebarBg:   isDark ? 'bg-[#0d0d10]'    : 'bg-white',
-    cardBg:      isDark ? 'bg-[#0f0f13]'    : 'bg-white',
-    cardBg2:     isDark ? 'bg-zinc-900/60'   : 'bg-slate-50',
-    border:      isDark ? 'border-white/5'   : 'border-slate-200',
-    border2:     isDark ? 'border-white/10'  : 'border-slate-300',
-    text:        isDark ? 'text-white'       : 'text-slate-900',
-    textSub:     isDark ? 'text-zinc-300'    : 'text-slate-700',
-    textMuted:   isDark ? 'text-zinc-400'    : 'text-slate-600',
-    textFaint:   isDark ? 'text-zinc-500'    : 'text-slate-500',
-    inputBg:     isDark ? 'bg-zinc-900'      : 'bg-white',
-    inputBg2:    isDark ? 'bg-zinc-800'      : 'bg-slate-100',
-    rowHover:    isDark ? 'hover:bg-white/[0.02]' : 'hover:bg-slate-50',
-    divider:     isDark ? 'divide-white/[0.03]'   : 'divide-slate-100',
-    navActive:   isDark ? 'bg-indigo-500/15 border-indigo-500/25 text-white' : 'bg-indigo-50 border-indigo-300 text-indigo-800',
-    navInactive: isDark ? 'border-transparent text-zinc-400 hover:text-zinc-100 hover:bg-white/5' : 'border-transparent text-slate-600 hover:text-slate-900 hover:bg-slate-100',
-    tableHead:   isDark ? 'text-zinc-400'    : 'text-slate-500',
-    btnSecondary: isDark ? 'bg-zinc-800 border border-white/10 hover:border-white/20 text-zinc-200' : 'bg-white border border-slate-300 hover:border-slate-400 text-slate-700',
-    toggleBg:    isDark ? 'bg-zinc-700'      : 'bg-slate-200',
-    statusBg:    isDark ? 'bg-zinc-800/60 border border-white/5' : 'bg-slate-100 border border-slate-200',
-  };
+  const t = useAdminTheme(isDark);
 
   return (
     <div className={`min-h-screen ${t.bg} ${t.text} flex flex-col transition-colors duration-200`}>
@@ -1408,88 +1117,22 @@ export default function AdminPage() {
 
       {/* ── Coupon Modal - DB 연동 ── */}
       {couponModal && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
-          <div className="absolute inset-0 bg-black/70" onClick={() => setCouponModal(false)} />
-          <div className={`relative ${t.cardBg} border ${t.border2} rounded-2xl w-full max-w-md p-6 z-10`}>
-            <div className="flex items-center justify-between mb-5">
-              <h3 className={`text-base font-black ${t.text}`}>쿠폰 생성</h3>
-              <button onClick={() => setCouponModal(false)} className={`w-7 h-7 flex items-center justify-center ${isDark ? 'text-zinc-500 hover:text-white' : 'text-gray-400 hover:text-gray-700'} cursor-pointer transition-colors`}>
-                <i className="ri-close-line text-lg" />
-              </button>
-            </div>
-            <div className="space-y-3">
-              <div>
-                <label className={`text-xs font-semibold ${t.textSub} mb-1.5 block`}>쿠폰 코드 <span className="text-red-400">*</span></label>
-                <input
-                  type="text"
-                  value={couponCode}
-                  onChange={(e) => setCouponCode(e.target.value.toUpperCase())}
-                  placeholder="예: SUMMER2026"
-                  className={`w-full ${t.inputBg} border ${t.border2} rounded-xl px-3 py-2.5 text-sm ${t.text} ${isDark ? 'placeholder-zinc-600' : 'placeholder-gray-400'} focus:outline-none focus:border-indigo-500/50 font-mono uppercase`}
-                />
-              </div>
-              <div className="grid grid-cols-2 gap-3">
-                <div>
-                  <label className={`text-xs font-semibold ${t.textSub} mb-1.5 block`}>할인 유형 <span className="text-red-400">*</span></label>
-                  <select
-                    value={couponDiscountType}
-                    onChange={(e) => setCouponDiscountType(e.target.value as 'percent' | 'credits')}
-                    className={`w-full ${t.inputBg} border ${t.border2} rounded-xl px-3 py-2.5 text-sm ${t.text} focus:outline-none focus:border-indigo-500/50 cursor-pointer`}
-                  >
-                    <option value="percent">구독 할인 (%)</option>
-                    <option value="credits">무료 크레딧</option>
-                  </select>
-                </div>
-                <div>
-                  <label className={`text-xs font-semibold ${t.textSub} mb-1.5 block`}>
-                    {couponDiscountType === 'percent' ? '할인율 (%)' : '크레딧 수'} <span className="text-red-400">*</span>
-                  </label>
-                  <input
-                    type="number"
-                    value={couponDiscount}
-                    onChange={(e) => setCouponDiscount(e.target.value)}
-                    placeholder={couponDiscountType === 'percent' ? '예: 30' : '예: 500'}
-                    className={`w-full ${t.inputBg} border ${t.border2} rounded-xl px-3 py-2.5 text-sm ${t.text} ${isDark ? 'placeholder-zinc-600' : 'placeholder-gray-400'} focus:outline-none focus:border-indigo-500/50`}
-                  />
-                </div>
-              </div>
-              <div className="grid grid-cols-2 gap-3">
-                <div>
-                  <label className={`text-xs font-semibold ${t.textSub} mb-1.5 block`}>사용 한도</label>
-                  <input
-                    type="number"
-                    value={couponMaxUses}
-                    onChange={(e) => setCouponMaxUses(e.target.value)}
-                    placeholder="무제한"
-                    className={`w-full ${t.inputBg} border ${t.border2} rounded-xl px-3 py-2.5 text-sm ${t.text} ${isDark ? 'placeholder-zinc-600' : 'placeholder-gray-400'} focus:outline-none focus:border-indigo-500/50`}
-                  />
-                </div>
-                <div>
-                  <label className={`text-xs font-semibold ${t.textSub} mb-1.5 block`}>만료일</label>
-                  <input
-                    type="date"
-                    value={couponExpires}
-                    onChange={(e) => setCouponExpires(e.target.value)}
-                    className={`w-full ${t.inputBg} border ${t.border2} rounded-xl px-3 py-2.5 text-sm ${t.text} focus:outline-none focus:border-indigo-500/50 cursor-pointer`}
-                  />
-                </div>
-              </div>
-            </div>
-            <div className="flex gap-2 mt-5">
-              <button
-                onClick={handleCouponCreate}
-                disabled={!couponCode.trim() || !couponDiscount.trim()}
-                className="flex-1 py-2.5 bg-indigo-500 hover:bg-indigo-400 disabled:opacity-40 disabled:cursor-not-allowed text-white text-xs font-bold rounded-xl cursor-pointer transition-colors whitespace-nowrap"
-              >
-                <i className="ri-coupon-3-line mr-1.5" />
-                DB에 쿠폰 생성
-              </button>
-              <button onClick={() => setCouponModal(false)} className={`flex-1 py-2.5 ${isDark ? 'bg-zinc-800 text-zinc-300 hover:bg-zinc-700' : 'bg-gray-100 text-gray-600 hover:bg-gray-200'} text-xs font-bold rounded-xl cursor-pointer transition-colors whitespace-nowrap`}>
-                취소
-              </button>
-            </div>
-          </div>
-        </div>
+        <CouponCreateModal
+          isDark={isDark}
+          t={t}
+          couponCode={couponCode}
+          setCouponCode={setCouponCode}
+          couponDiscount={couponDiscount}
+          setCouponDiscount={setCouponDiscount}
+          couponDiscountType={couponDiscountType}
+          setCouponDiscountType={setCouponDiscountType}
+          couponMaxUses={couponMaxUses}
+          setCouponMaxUses={setCouponMaxUses}
+          couponExpires={couponExpires}
+          setCouponExpires={setCouponExpires}
+          onCreate={handleCouponCreate}
+          onClose={() => setCouponModal(false)}
+        />
       )}
 
       {/* ── Toast Notifications ── */}
@@ -1721,85 +1364,20 @@ export default function AdminPage() {
 
       {/* ── Add Admin Modal ── */}
       {addAdminModal && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
-          <div className="absolute inset-0 bg-black/70" onClick={() => setAddAdminModal(false)} />
-          <div className={`relative ${t.cardBg} border ${t.border2} rounded-2xl w-full max-w-md p-6 z-10`}>
-            <div className="flex items-center justify-between mb-5">
-              <h3 className={`text-base font-black ${t.text}`}>관리자 계정 추가</h3>
-              <button onClick={() => setAddAdminModal(false)} className={`w-7 h-7 flex items-center justify-center ${isDark ? 'text-zinc-500 hover:text-white' : 'text-gray-400 hover:text-gray-700'} cursor-pointer transition-colors`}>
-                <i className="ri-close-line text-lg" />
-              </button>
-            </div>
-            <div className="space-y-3">
-              <div>
-                <label className={`text-xs font-semibold ${t.textSub} mb-1.5 block`}>이름</label>
-                <input
-                  type="text"
-                  value={newAdminName}
-                  onChange={(e) => setNewAdminName(e.target.value)}
-                  placeholder="관리자 이름"
-                  className={`w-full ${t.inputBg} border ${t.border2} rounded-xl px-3 py-2.5 text-sm ${t.text} ${isDark ? 'placeholder-zinc-600' : 'placeholder-gray-400'} focus:outline-none focus:border-indigo-500/50`}
-                />
-              </div>
-              <div>
-                <label className={`text-xs font-semibold ${t.textSub} mb-1.5 block`}>이메일</label>
-                <input
-                  type="email"
-                  value={newAdminEmail}
-                  onChange={(e) => setNewAdminEmail(e.target.value)}
-                  placeholder="admin@aimetawow.com"
-                  className={`w-full ${t.inputBg} border ${t.border2} rounded-xl px-3 py-2.5 text-sm ${t.text} ${isDark ? 'placeholder-zinc-600' : 'placeholder-gray-400'} focus:outline-none focus:border-indigo-500/50`}
-                />
-              </div>
-              <div>
-                <label className={`text-xs font-semibold ${t.textSub} mb-1.5 block`}>역할</label>
-                <select
-                  value={newAdminRole}
-                  onChange={(e) => setNewAdminRole(e.target.value)}
-                  className={`w-full ${t.inputBg} border ${t.border2} rounded-xl px-3 py-2.5 text-sm ${t.text} focus:outline-none focus:border-indigo-500/50 cursor-pointer`}
-                >
-                  <option>CS Manager</option>
-                  <option>System Admin</option>
-                  <option>Content Moderator</option>
-                </select>
-              </div>
-              <div>
-                <label className={`text-xs font-semibold ${t.textSub} mb-1.5 block`}>접근 권한</label>
-                <div className="grid grid-cols-2 gap-2">
-                  {['사용자 관리', 'AI 콘텐츠', 'AI 엔진', '결제 관리', 'CS / 공지', '감사 로그'].map((perm) => (
-                    <label key={perm} className="flex items-center gap-2 cursor-pointer">
-                      <input
-                        type="checkbox"
-                        checked={newAdminPerms.includes(perm)}
-                        onChange={(e) => {
-                          if (e.target.checked) {
-                            setNewAdminPerms((prev) => [...prev, perm]);
-                          } else {
-                            setNewAdminPerms((prev) => prev.filter((p) => p !== perm));
-                          }
-                        }}
-                        className="w-3.5 h-3.5 rounded accent-indigo-500 cursor-pointer"
-                      />
-                      <span className={`text-xs ${t.textSub}`}>{perm}</span>
-                    </label>
-                  ))}
-                </div>
-              </div>
-            </div>
-            <div className="flex gap-2 mt-5">
-              <button
-                onClick={handleAddAdmin}
-                disabled={!newAdminName.trim() || !newAdminEmail.trim()}
-                className="flex-1 py-2.5 bg-indigo-500 hover:bg-indigo-400 disabled:opacity-40 disabled:cursor-not-allowed text-white text-xs font-bold rounded-xl cursor-pointer transition-colors whitespace-nowrap"
-              >
-                계정 생성 & 초대 발송
-              </button>
-              <button onClick={() => setAddAdminModal(false)} className={`flex-1 py-2.5 ${isDark ? 'bg-zinc-800 text-zinc-300 hover:bg-zinc-700' : 'bg-gray-100 text-gray-600 hover:bg-gray-200'} text-xs font-bold rounded-xl cursor-pointer transition-colors whitespace-nowrap`}>
-                취소
-              </button>
-            </div>
-          </div>
-        </div>
+        <AddAdminModal
+          isDark={isDark}
+          t={t}
+          newAdminName={newAdminName}
+          setNewAdminName={setNewAdminName}
+          newAdminEmail={newAdminEmail}
+          setNewAdminEmail={setNewAdminEmail}
+          newAdminRole={newAdminRole}
+          setNewAdminRole={setNewAdminRole}
+          newAdminPerms={newAdminPerms}
+          setNewAdminPerms={setNewAdminPerms}
+          onCreate={handleAddAdmin}
+          onClose={() => setAddAdminModal(false)}
+        />
       )}
 
     </div>

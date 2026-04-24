@@ -3,6 +3,7 @@ import type { RouteObject } from "react-router-dom";
 import Home from "../pages/home/page";
 import NotFound from "../pages/NotFound";
 import AdminGuard from "../components/feature/AdminGuard";
+import ErrorBoundary from "../components/base/ErrorBoundary";
 
 const AICreate = lazy(() => import("../pages/ai-create/page"));
 const AIAutomation = lazy(() => import("../pages/ai-automation/page"));
@@ -20,74 +21,23 @@ const AdminLogin = lazy(() => import("../pages/admin-login/page"));
 const CreditPurchase = lazy(() => import("../pages/credit-purchase/page"));
 
 const routes: RouteObject[] = [
-  {
-    path: "/",
-    element: <Home />,
-  },
-  {
-    path: "/ai-create",
-    element: <AICreate />,
-  },
-  {
-    path: "/metawow",
-    element: <AICreate />,
-  },
-  {
-    path: "/automation-studio",
-    element: <AIAutomation />,
-  },
-  {
-    path: "/ai-sound",
-    element: <AISound />,
-  },
-  {
-    path: "/ai-board",
-    element: <AIBoard />,
-  },
-  {
-    path: "/ai-ad",
-    element: <AIAd />,
-  },
-  {
-    path: "/ai-services",
-    element: <AIShortcuts />,
-  },
-  {
-    path: "/youtube-studio",
-    element: <YoutubeStudio />,
-  },
-  {
-    path: "/workflow",
-    element: <Workflow />,
-  },
-  {
-    path: "/terms",
-    element: <Terms />,
-  },
-  {
-    path: "/privacy",
-    element: <Privacy />,
-  },
-  {
-    path: "/customer-support",
-    element: <CustomerSupport />,
-  },
-  {
-    path: "/admin-login",
-    element: <AdminLogin />,
-  },
-  {
-    path: "/admin",
-    element: <AdminGuard><Admin /></AdminGuard>,
-  },
-  {
-    path: "/credit-purchase",
-    element: <CreditPurchase />,
-  },
-  {
-    path: "*",
-    element: <NotFound />,
-  },
+  { path: "/", element: <ErrorBoundary><Home /></ErrorBoundary> },
+  { path: "/ai-create", element: <ErrorBoundary><AICreate /></ErrorBoundary> },
+  { path: "/metawow", element: <ErrorBoundary><AICreate /></ErrorBoundary> },
+  { path: "/automation-studio", element: <ErrorBoundary><AIAutomation /></ErrorBoundary> },
+  { path: "/ai-sound", element: <ErrorBoundary><AISound /></ErrorBoundary> },
+  { path: "/ai-board", element: <ErrorBoundary><AIBoard /></ErrorBoundary> },
+  { path: "/ai-ad", element: <ErrorBoundary><AIAd /></ErrorBoundary> },
+  { path: "/ai-services", element: <ErrorBoundary><AIShortcuts /></ErrorBoundary> },
+  { path: "/youtube-studio", element: <ErrorBoundary><YoutubeStudio /></ErrorBoundary> },
+  { path: "/workflow", element: <ErrorBoundary><Workflow /></ErrorBoundary> },
+  { path: "/terms", element: <ErrorBoundary><Terms /></ErrorBoundary> },
+  { path: "/privacy", element: <ErrorBoundary><Privacy /></ErrorBoundary> },
+  { path: "/customer-support", element: <ErrorBoundary><CustomerSupport /></ErrorBoundary> },
+  { path: "/admin-login", element: <ErrorBoundary><AdminLogin /></ErrorBoundary> },
+  { path: "/admin", element: <ErrorBoundary><AdminGuard><Admin /></AdminGuard></ErrorBoundary> },
+  { path: "/credit-purchase", element: <ErrorBoundary><CreditPurchase /></ErrorBoundary> },
+  { path: "*", element: <NotFound /> },
 ];
 
 export default routes;
