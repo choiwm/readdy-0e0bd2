@@ -319,7 +319,7 @@ async function pollOnce(
         const parsed = parseFalErrorShared(statusRes.status, parsedBody, statusRes);
         return new Response(JSON.stringify({
           status: 'FAILED',
-          ...toClientPayload(parsed),
+          ...toClientPayload(parsed, extractFalRequestId(statusRes)),
           retryable: parsed.is_retryable,
         }), { headers: corsH });
       }
@@ -619,7 +619,7 @@ Deno.serve(async (req) => {
           status: 'failed', creditsDeducted: 0,
           metadata: { model: falModel, error: sharedParsed.message_kr, kind: sharedParsed.kind, http_status: falRes.status },
         });
-        return respond(toClientPayload(sharedParsed), falRes.status);
+        return respond(toClientPayload(sharedParsed, extractFalRequestId(falRes)), falRes.status);
       }
 
       const errMsg=falRes.status===429?'fal.ai 대기열이 혼잡해요. 잠시 후 다시 시도해주세요.'

@@ -145,7 +145,7 @@ async function runProbe(
       task, model: modelPath, ok: false,
       http_status: res.status, duration_ms,
       fal_request_id: getFalRequestId(res),
-      error: toClientPayload(parsed),
+      error: toClientPayload(parsed, getFalRequestId(res)),
     };
   } catch (e) {
     const duration_ms = Date.now() - start;
