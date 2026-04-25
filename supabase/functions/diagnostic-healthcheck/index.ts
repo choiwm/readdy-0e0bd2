@@ -91,6 +91,13 @@ async function getFalKey(supabase: ReturnType<typeof createClient>): Promise<{ k
 }
 
 // ── Probe runner ──────────────────────────────────────────────────────────
+// validateOnly mode: send an intentionally-empty body and treat 422 as
+// "OK — path verified". Useful for confirming a model path exists on
+// fal.ai's catalog without burning credits on a real generation.
+//   - 200/202    → path exists AND request was accepted
+//   - 422        → path exists but body was rejected (validateOnly: success)
+//   - 404        → path does NOT exist (the kling-v1.6 bug we fixed in PR #13)
+//   - 401/403    → auth issue
 async function runProbe(
   task: string,
   modelPath: string,
@@ -98,6 +105,7 @@ async function runProbe(
   body: unknown,
   falKey: string,
   timeoutMs = 30_000,
+  validateOnly = false,
 ): Promise<ProbeResult> {
   const start = Date.now();
   try {
@@ -120,6 +128,15 @@ async function runProbe(
         task, model: modelPath, ok: true,
         http_status: res.status, duration_ms,
         fal_request_id: getFalRequestId(res),
+      };
+    }
+
+    if (validateOnly && res.status === 422) {
+      return {
+        task, model: modelPath, ok: true,
+        http_status: res.status, duration_ms,
+        fal_request_id: getFalRequestId(res),
+        note: 'path verified (422 expected — empty body)',
       };
     }
 
@@ -170,6 +187,38 @@ const VIDEO_PROBES = [
     modelKey: 'kling-v1',
     url: () => `https://queue.fal.run/fal-ai/kling-video/v1/standard/text-to-video`,
     body: { prompt: 'a white square', duration: '5' },
+  },
+];
+
+// validateOnly probes — verify the path exists on fal.ai's catalog without
+// spending credits. We send an empty body and accept 422 as "OK".
+// Added after PR #13 found that multishot was hitting nonexistent kling-v1.6
+// for the entire product lifetime — these probes catch that class of bug
+// the next time it happens.
+const PATH_VALIDATION_PROBES = [
+  {
+    task: 'path:kling-v2.1-pro/i2v (multishot)',
+    modelKey: 'kling-v2.1-pro',
+    url: () => `https://queue.fal.run/fal-ai/kling-video/v2.1/pro/image-to-video`,
+    body: {},
+  },
+  {
+    task: 'path:kling-v2.5-turbo/i2v',
+    modelKey: 'kling-v2.5-turbo',
+    url: () => `https://queue.fal.run/fal-ai/kling-video/v2.5-turbo/standard/image-to-video`,
+    body: {},
+  },
+  {
+    task: 'path:kling-v3-pro/t2v',
+    modelKey: 'kling-v3-pro',
+    url: () => `https://queue.fal.run/fal-ai/kling-video/v3/pro/text-to-video`,
+    body: {},
+  },
+  {
+    task: 'path:vton workflow',
+    modelKey: 'workflows/fal-vton',
+    url: () => `https://queue.fal.run/workflows/fal-vton`,
+    body: {},
   },
 ];
 
@@ -233,6 +282,12 @@ Deno.serve(async (req) => {
       continue;
     }
     probes.push(await runProbe(probe.task, probe.modelKey, probe.url(), probe.body, falKey));
+  }
+
+  // Path-only validation probes — always run, regardless of include_video.
+  // Empty body intentionally — 422 is the success signal (path exists).
+  for (const probe of PATH_VALIDATION_PROBES) {
+    probes.push(await runProbe(probe.task, probe.modelKey, probe.url(), probe.body, falKey, 30_000, true));
   }
 
   const summary = {
