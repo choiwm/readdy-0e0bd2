@@ -5,6 +5,7 @@ import { supabase } from '@/lib/supabase';
 import { useAuth } from '@/hooks/useAuth';
 import { useCredits } from '@/hooks/useCredits';
 import { useNotifications } from '@/hooks/useNotifications';
+import { ExpirableMedia } from '@/components/base/ExpirableMedia';
 import { uploadProductImagesToStorage } from '@/pages/ai-ad/utils/uploadProductImage';
 import { getSessionId, pollImageResult, pollFalVideoResult } from '@/pages/ai-ad/utils/falPolling';
 import {
@@ -767,9 +768,9 @@ export default function AdDetailModal({ template, productName, productDesc, side
           ) : result ? (
             <div className="absolute inset-0 flex flex-col">
               {result.type === 'video' ? (
-                <video src={result.url} className="w-full h-full object-cover object-top" autoPlay muted loop playsInline />
+                <ExpirableMedia type="video" src={result.url} className="w-full h-full object-cover object-top" autoPlay muted loop playsInline />
               ) : (
-                <img src={result.url} alt="Generated" className="w-full h-full object-cover object-top" />
+                <ExpirableMedia type="image" src={result.url} alt="Generated" className="w-full h-full object-cover object-top" />
               )}
               <div className="absolute inset-0 bg-gradient-to-t from-black/90 via-transparent to-transparent" />
               <div className="absolute top-4 left-4 flex items-center gap-2 flex-wrap">
@@ -885,8 +886,8 @@ export default function AdDetailModal({ template, productName, productDesc, side
             {result ? (
               <>
                 {result.type === 'video'
-                  ? <video src={result.url} className="w-full h-full object-cover object-top" autoPlay muted loop playsInline />
-                  : <img src={result.url} alt="Generated" className="w-full h-full object-cover object-top" />
+                  ? <ExpirableMedia type="video" src={result.url} className="w-full h-full object-cover object-top" autoPlay muted loop playsInline />
+                  : <ExpirableMedia type="image" src={result.url} alt="Generated" className="w-full h-full object-cover object-top" />
                 }
                 <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-transparent to-transparent" />
                 <div className="absolute top-2 left-2">
