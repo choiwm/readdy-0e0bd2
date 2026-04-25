@@ -3,6 +3,16 @@ import { requireUser, AuthFailure } from '../_shared/auth.ts';
 import { buildCorsHeaders, handlePreflight } from '../_shared/cors.ts';
 import { checkRateLimit, rateLimitedResponse, POLICIES } from '../_shared/rateLimit.ts';
 import { persistFalAsset } from '../_shared/fal_storage.ts';
+import { VERIFIED_FAL_VIDEO_MODELS } from '../_shared/fal_video_models.ts';
+
+// Multishot per-shot generator. The previous hardcoded path
+// 'fal-ai/kling-video/v1.6/pro/image-to-video' does not exist on fal.ai —
+// the catalog goes v1 → v1.5 → v2.1 → v2.5-turbo → v3, no v1.6. Every
+// multishot run was 404'ing at the queue submit. We pin to the registry's
+// kling-v2.1-pro i2v which is the closest verified equivalent.
+const MULTISHOT_VIDEO_MODEL_PATH =
+  VERIFIED_FAL_VIDEO_MODELS['kling-v2.1-pro']?.i2v
+  ?? 'fal-ai/kling-video/v2.1/pro/image-to-video';
 
 const MULTISHOT_CREDIT_COST_FALLBACK = 180;
 const MULTISHOT_MODEL_ID = 'workflows/kling-multi-shot-creator';
@@ -409,7 +419,7 @@ async function actionGenVideo(body: Record<string, unknown>, supabase: ReturnTyp
   const klingDuration = parseInt(duration, 10) <= 5 ? '5' : '10';
 
   // 공식 문서: fal_max_queue_length + X-Fal-Object-Lifecycle-Preference
-  const res = await fetch('https://queue.fal.run/fal-ai/kling-video/v1.6/pro/image-to-video?fal_max_queue_length=10', {
+  const res = await fetch(`https://queue.fal.run/${MULTISHOT_VIDEO_MODEL_PATH}?fal_max_queue_length=10`, {
     method: 'POST',
     headers: {
       'Authorization': `Key ${FAL_KEY}`,
@@ -449,8 +459,7 @@ async function actionPollVideo(body: Record<string, unknown>, supabase: ReturnTy
   if (!FAL_KEY) FAL_KEY = Deno.env.get("FAL_KEY") ?? null;
   if (!FAL_KEY) throw new Error("fal.ai API 키 없음");
 
-  const MODEL_PATH = 'fal-ai/kling-video/v1.6/pro/image-to-video';
-  const pollResult = await pollFalStatus(FAL_KEY, MODEL_PATH, request_id, statusUrlFromPost);
+  const pollResult = await pollFalStatus(FAL_KEY, MULTISHOT_VIDEO_MODEL_PATH, request_id, statusUrlFromPost);
   const { falStatus, queuePos, isNetworkError } = parsePollResult(pollResult);
 
   console.log(`[multishot:poll_video] shot=${shot_index}, falStatus=${falStatus}, queue_pos=${queuePos}`);
