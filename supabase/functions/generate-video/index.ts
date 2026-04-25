@@ -168,6 +168,9 @@ function getFalRetryableHeader(res: Response): string|null {
 function extractFalRequestId(res: Response): string|null {
   return res.headers.get('x-fal-request-id') ?? res.headers.get('X-Fal-Request-Id') ?? null;
 }
+function extractBillableUnits(res: Response): string|null {
+  return res.headers.get('X-Fal-Billable-Units') ?? res.headers.get('x-fal-billable-units') ?? null;
+}
 
 async function decryptKey(enc: string): Promise<string|null> {
   try {
@@ -343,6 +346,8 @@ async function pollOnce(
       if (falStatus==='COMPLETED') {
         console.log(`[generate-video:poll] COMPLETED! 결과 조회: ${resolvedResponseUrl}`);
         let resultData: Record<string,unknown>|null = null;
+        let resultFalReqId: string | null = null;
+        let resultBillable: string | null = null;
         for (let ri=0; ri<=MAX_RETRIES; ri++) {
           const resultRes = await fetch(resolvedResponseUrl,{method:'GET',headers:{'Authorization':`Key ${FAL_KEY}`},signal:AbortSignal.timeout(30000)});
           const resultText = await resultRes.text();
@@ -356,6 +361,8 @@ async function pollOnce(
             if(errInfo.isRetryable&&ri<MAX_RETRIES){await new Promise(r=>setTimeout(r,3000));continue;}
             return new Response(JSON.stringify({status:'FAILED',error:errInfo.message,fal_error_type:errType,model_errors:errInfo.modelErrors}),{headers:corsH});
           }
+          resultFalReqId = extractFalRequestId(resultRes);
+          resultBillable = extractBillableUnits(resultRes);
           try{resultData=JSON.parse(resultText);break;}catch{return new Response(JSON.stringify({status:'FAILED',error:'결과 파싱 실패'}),{headers:corsH});}
         }
 
@@ -412,6 +419,8 @@ async function pollOnce(
               polling_completed:true,
               ad_work_id:adWorkId,
               video_url_prefix:videoUrl.slice(0,80),
+              fal_request_id:resultFalReqId,
+              billable_units:resultBillable,
             },
           });
         }
@@ -573,7 +582,9 @@ Deno.serve(async (req) => {
 
     const falText=await falRes.text();
     const falReqId=extractFalRequestId(falRes);
+    const falBillable=extractBillableUnits(falRes);
     if(falReqId) console.log(`[generate-video] x-fal-request-id: ${falReqId}`);
+    if(falBillable) console.log(`[generate-video] X-Fal-Billable-Units: ${falBillable}`);
     console.log(`[generate-video] queue HTTP ${falRes.status}: ${falText.slice(0,500)}`);
 
     if(!falRes.ok){
@@ -618,7 +629,7 @@ Deno.serve(async (req) => {
     if(rawImmediateUrl){
       const immediateUrl = await persistFalAsset(supabase, rawImmediateUrl, 'video', (user_id as string | undefined) ?? (session_id as string | undefined) ?? 'anon');
       console.log(`[generate-video] 즉시 완료: ${immediateUrl.slice(0,100)}`);
-      await logUsage(supabase,{userId:user_id as string|undefined,sessionId:session_id as string|undefined,action:`영상 생성 완료 (${falModel}) - immediate`,status:'success',creditsDeducted:creditCost,metadata:{model:falModel,immediate:true}});
+      await logUsage(supabase,{userId:user_id as string|undefined,sessionId:session_id as string|undefined,action:`영상 생성 완료 (${falModel}) - immediate`,status:'success',creditsDeducted:creditCost,metadata:{model:falModel,immediate:true,fal_request_id:falReqId,billable_units:falBillable}});
       const adWorkId=await saveResults(supabase,{videoUrl:immediateUrl,prompt:prompt as string,model:falModel,ratio:aspectRatio,userId:user_id as string|undefined,sessionId:session_id as string|undefined,source:source as string|undefined,templateId:template_id as string|undefined,templateTitle:template_title as string|undefined,resolution:resolution as string,format:format as string,productName:product_name as string|undefined,productDesc:product_desc as string|undefined});
       return respond({videoUrl:immediateUrl,status:'COMPLETED',ad_work_id:adWorkId});
     }
