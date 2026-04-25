@@ -3,6 +3,7 @@ import { supabase } from '@/lib/supabase';
 import { useAuth } from '@/hooks/useAuth';
 import GallerySaveToast from './GallerySaveToast';
 import PromptOptimizePanel from './PromptOptimizePanel';
+import { pollImageResult } from '@/pages/ai-ad/utils/falPolling';
 import {
   initialCuts,
   stylePromptModifiers,
@@ -208,17 +209,34 @@ export default function Step4Image({
         const detail = data?.error || data?.detail || error.message;
         throw Object.assign(new Error(detail), { data });
       }
-      if (!data?.success || !data?.imageUrl) {
+
+      // generate-image 가 sync 로 끝나면 imageUrl 즉시 반환, 큐로 빠지면
+      // pending=true + request_id 가 와서 클라가 폴링해야 해요. 이전엔 pending
+      // 응답을 그냥 실패로 처리해서 비-schnell 모델 선택 시 침묵 실패였어요.
+      let finalImageUrl: string | null = null;
+      if (data?.success && data?.imageUrl) {
+        finalImageUrl = data.imageUrl as string;
+      } else if (data?.pending && data?.request_id) {
+        finalImageUrl = await pollImageResult(
+          data.model as string,
+          data.request_id as string,
+          data.status_url as string | undefined,
+          data.response_url as string | undefined,
+          data.save_opts as Record<string, unknown> | undefined,
+        );
+      }
+
+      if (!finalImageUrl) {
         throw Object.assign(new Error(data?.error || '이미지 생성에 실패했습니다.'), { data });
       }
 
       setCuts((prev) => prev.map((c) =>
-        c.id === id ? { ...c, image: data.imageUrl } : c
+        c.id === id ? { ...c, image: finalImageUrl } : c
       ));
 
       // 갤러리 자동 저장 (백그라운드)
       const finalPromptForGallery = cut.prompt.trim() || buildOptimizedPrompt(id, selectedStyle, selectedKeywords);
-      saveToGallery(data.imageUrl, finalPromptForGallery, id, true);
+      saveToGallery(finalImageUrl, finalPromptForGallery, id, true);
 
     } catch (err) {
       const raw = err instanceof Error ? err.message : String(err);
@@ -293,9 +311,21 @@ export default function Step4Image({
           const detail = data?.error || data?.detail || error.message;
           throw Object.assign(new Error(detail), { data });
         }
+        let bulkImageUrl: string | null = null;
         if (data?.success && data?.imageUrl) {
+          bulkImageUrl = data.imageUrl as string;
+        } else if (data?.pending && data?.request_id) {
+          bulkImageUrl = await pollImageResult(
+            data.model as string,
+            data.request_id as string,
+            data.status_url as string | undefined,
+            data.response_url as string | undefined,
+            data.save_opts as Record<string, unknown> | undefined,
+          );
+        }
+        if (bulkImageUrl) {
           setCuts((prev) => prev.map((c) =>
-            c.id === cut.id ? { ...c, image: data.imageUrl } : c
+            c.id === cut.id ? { ...c, image: bulkImageUrl } : c
           ));
           // 갤러리 자동 저장 (개별 토스트 없이 백그라운드 저장)
           const promptForGallery = finalPrompt;
