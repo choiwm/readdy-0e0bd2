@@ -230,6 +230,7 @@ function WorkCard({ work, onDelete, onPreview }: { work: MyWorkItem; onDelete: (
             type="image"
             src={work.result.url}
             alt={work.title}
+            loading="lazy"
             className="w-full h-full object-cover object-top group-hover:scale-105 transition-transform duration-500"
           />
         )}
