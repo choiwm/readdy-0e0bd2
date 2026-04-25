@@ -8,6 +8,7 @@ import {
   VERIFIED_FAL_IMAGE_MODELS,
 } from '../_shared/fal_image_models.ts';
 import { parseFalError, toClientPayload } from '../_shared/fal_errors.ts';
+import { persistFalAsset } from '../_shared/fal_storage.ts';
 
 const CINEMATIC_SUFFIXES: Record<string, string> = {
   "Wide Shot":     "wide establishing shot, cinematic composition, dramatic lighting",
@@ -453,7 +454,7 @@ async function handlePollMode(
 
         const extracted = extractImgResult(resultData);
         console.log(`[generate-image:poll] imageUrl 추출: ${extracted.url ? extracted.url.slice(0, 80) : 'null'}`);
-        
+
         if (!extracted.url) {
           return new Response(JSON.stringify({
             status: 'FAILED',
@@ -461,6 +462,11 @@ async function handlePollMode(
             raw: JSON.stringify(resultData).slice(0, 300),
           }), { headers: corsH });
         }
+
+        extracted.url = await persistFalAsset(
+          supabase, extracted.url, 'image',
+          (saveOpts?.user_id as string | undefined) ?? (saveOpts?.session_id as string | undefined) ?? 'anon',
+        );
 
         let adWorkId: string | null = null;
         if (saveOpts) {
@@ -731,6 +737,8 @@ Deno.serve(async (req) => {
 
         const extracted = extractImgResult(data);
         if (extracted.url) {
+          extracted.url = await persistFalAsset(supabase, extracted.url, 'image', authedUserId ?? session_id ?? 'anon');
+
           await logUsage(supabase, {
             userId: authedUserId, sessionId: session_id, serviceSlug: 'fal',
             action: `이미지 생성 (${model})`, creditsDeducted: 0, userPlan: 'test', status: 'success',
@@ -825,6 +833,7 @@ Deno.serve(async (req) => {
 
     const immediateExtracted = extractImgResult(queueData);
     if (immediateExtracted.url) {
+      immediateExtracted.url = await persistFalAsset(supabase, immediateExtracted.url, 'image', authedUserId ?? session_id ?? 'anon');
       console.log(`[generate-image] Queue 즉시 완료: ${immediateExtracted.url.slice(0, 80)}`);
 
       await logUsage(supabase, {
