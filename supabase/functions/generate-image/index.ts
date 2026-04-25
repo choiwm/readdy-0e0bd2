@@ -668,7 +668,6 @@ Deno.serve(async (req) => {
           num_images: 1,
           output_format,
           enable_safety_checker,
-          enable_safety_checks: enable_safety_checker,
           ...(seed != null ? { seed: Number(seed) } : {}),
         };
       } else {
@@ -682,7 +681,6 @@ Deno.serve(async (req) => {
           num_images: 1,
           output_format,
           enable_safety_checker,
-          enable_safety_checks: enable_safety_checker,
           ...(seed != null ? { seed: Number(seed) } : {}),
         };
       }
@@ -695,7 +693,6 @@ Deno.serve(async (req) => {
         num_images: 1,
         output_format,
         enable_safety_checker,
-        enable_safety_checks: enable_safety_checker,
         ...(seed != null ? { seed: Number(seed) } : {}),
       };
     }
