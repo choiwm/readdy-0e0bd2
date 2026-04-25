@@ -554,7 +554,12 @@ Deno.serve(async (req) => {
   const falBody: Record<string,unknown>={prompt,aspect_ratio:aspectRatio};
 
   if(!falModel.includes('veo3')&&!falModel.includes('minimax')){
-    falBody.duration=duration<=5?5:10;
+    // kling-video 의 duration 은 enum string ("5"|"10") — number 로 보내면
+    // 엄격 모드에서 422 를 받을 수 있어요. fal.ai 의 healthcheck 프로브와도
+    // 동일 형식 유지.
+    // ref: https://fal.ai/docs/model-api-reference (kling-video/v1)
+    const durationStr = duration<=5?'5':'10';
+    falBody.duration = falModel.includes('kling') ? durationStr : Number(durationStr);
     falBody.negative_prompt='blurry, low quality, watermark';
   }
   if(falModel==='fal-ai/wan-25-preview/text-to-video') falBody.num_frames=81;
