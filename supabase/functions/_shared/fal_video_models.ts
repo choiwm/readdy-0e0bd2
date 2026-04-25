@@ -9,7 +9,8 @@
 
 export interface VideoModelEntry {
   id: string;
-  t2v: string;
+  /** Text-to-video path. `null` if the model only supports image-to-video. */
+  t2v: string | null;
   i2v: string | null;
   /** True when we have a smoke-test artifact proving the path is live. */
   verified: boolean;
@@ -89,10 +90,15 @@ export const VERIFIED_FAL_VIDEO_MODELS: Record<string, VideoModelEntry> = {
     verified: false,
   },
 
-  // ── MiniMax (i2v only) ───────────────────────────────────────────────────
+  // ── MiniMax (i2v only on this account's catalog) ─────────────────────────
+  // 이전엔 t2v 도 'minimax-video/image-to-video' 로 잘못 매핑돼 있어서, 사용자가
+  // 텍스트-투-비디오로 minimax 를 고르면 i2v 엔드포인트가 image_url 없는 요청
+  // 을 422 로 거절했어요. 실제 minimax t2v 의 fal.ai 경로는 계정·모델 라이선스
+  // 별로 다른 형태 (`fal-ai/minimax-video-01` 류) 라 일단 null 로 표시하고,
+  // 프런트가 t2v=null 인 모델은 i2v 모드로만 노출하도록 처리.
   'minimax': {
     id: 'minimax',
-    t2v: 'fal-ai/minimax-video/image-to-video',
+    t2v: null,
     i2v: 'fal-ai/minimax-video/image-to-video',
     verified: true,
   },

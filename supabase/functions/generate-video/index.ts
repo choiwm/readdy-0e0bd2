@@ -11,9 +11,12 @@ import { persistFalAsset } from '../_shared/fal_storage.ts';
 
 // Build per-direction lookup tables from the canonical registry. This keeps
 // the wire format unchanged (frontend still sends "kling-v1" etc.) while
-// removing the second copy of model paths.
+// removing the second copy of model paths. t2v 가 null 인 모델 (예:
+// i2v-only minimax) 은 T2V_MODELS 에서 제외해 lookup 시 자연스럽게 미스.
 const T2V_MODELS: Record<string, string> = Object.fromEntries(
-  Object.entries(VERIFIED_FAL_VIDEO_MODELS).map(([k, v]) => [k, v.t2v]),
+  Object.entries(VERIFIED_FAL_VIDEO_MODELS)
+    .filter(([, v]) => v.t2v != null)
+    .map(([k, v]) => [k, v.t2v as string]),
 );
 const I2V_MODELS: Record<string, string> = Object.fromEntries(
   Object.entries(VERIFIED_FAL_VIDEO_MODELS)
@@ -24,8 +27,8 @@ const I2V_MODELS: Record<string, string> = Object.fromEntries(
 // Reverse lookup: given a t2v fal path, find the matching i2v path.
 const T2V_TO_I2V_MAP: Record<string, string> = Object.fromEntries(
   Object.values(VERIFIED_FAL_VIDEO_MODELS)
-    .filter((v) => v.i2v != null && v.t2v !== v.i2v)
-    .map((v) => [v.t2v, v.i2v as string]),
+    .filter((v) => v.t2v != null && v.i2v != null && v.t2v !== v.i2v)
+    .map((v) => [v.t2v as string, v.i2v as string]),
 );
 
 function resolveModelId(modelId: string, hasImage: boolean): string {
