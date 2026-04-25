@@ -25,6 +25,9 @@ type Props = {
   muted?: boolean;
   playsInline?: boolean;
   preload?: 'none' | 'metadata' | 'auto';
+  // <img loading=...> 패스스루 (gallery 그리드처럼 viewport 밖 다수 이미지가
+  // 한꺼번에 로드돼 LCP 가 깨지는 경우 'lazy' 권장)
+  loading?: 'lazy' | 'eager';
   // 공통 이벤트
   onLoad?: () => void;
   onLoadedData?: () => void;
@@ -32,7 +35,7 @@ type Props = {
 
 export const ExpirableMedia = forwardRef<HTMLVideoElement | HTMLImageElement, Props>(
   function ExpirableMedia(
-    { type, src, alt, className, style, controls, autoPlay, loop, muted, playsInline, preload, onLoad, onLoadedData },
+    { type, src, alt, className, style, controls, autoPlay, loop, muted, playsInline, preload, loading, onLoad, onLoadedData },
     ref,
   ) {
     const [errored, setErrored] = useState(false);
@@ -73,6 +76,7 @@ export const ExpirableMedia = forwardRef<HTMLVideoElement | HTMLImageElement, Pr
         alt={alt}
         className={className}
         style={style}
+        loading={loading}
         onError={() => setErrored(true)}
         onLoad={onLoad}
       />
