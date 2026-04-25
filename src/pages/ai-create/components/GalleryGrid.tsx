@@ -3,6 +3,7 @@ import { useGallery } from '@/hooks/useGallery';
 import { useAuth } from '@/hooks/useAuth';
 import { GalleryItem, GalleryItemSource } from '@/mocks/galleryItems';
 import RangeSlider from './RangeSlider';
+import { SUPABASE_URL } from '@/lib/env';
 import EmptyState from '@/components/base/EmptyState';
 import PageHeader from '@/components/feature/PageHeader';
 import { ExpirableMedia } from '@/components/base/ExpirableMedia';
@@ -241,7 +242,10 @@ const EDIT_PRESETS = [
   { id: 'face_enhance', label: '얼굴 보정', icon: 'ri-user-smile-line', desc: '얼굴 디테일을 자동 보정' },
 ];
 
-const EDGE_FN_URL = 'https://kkeijdddandmvsaukpcn.supabase.co/functions/v1/generate-image';
+// 이전엔 prod 프로젝트 URL 이 하드코딩돼 있어서 staging/fork 빌드에서도
+// 그대로 prod 를 때렸어요. PR #24 가 ai-automation 의 동일 패턴을 잡으면서
+// 놓친 마지막 잔존 사이트.
+const EDGE_FN_URL = `${SUPABASE_URL}/functions/v1/generate-image`;
 
 function ImageEditModal({ item, onClose }: { item: GalleryItem; onClose: () => void }) {
   const [selectedPreset, setSelectedPreset] = useState<string | null>(null);
