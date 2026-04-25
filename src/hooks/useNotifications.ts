@@ -182,6 +182,37 @@ export function useNotifications() {
     }
   }, [profile?.id]);
 
+  const deleteNotification = useCallback(async (notificationId: string) => {
+    if (!profile?.id) return;
+    const removed = notifications.find((n) => n.id === notificationId);
+    setNotifications((prev) => prev.filter((n) => n.id !== notificationId));
+    if (removed && !removed.is_read) setUnreadCount((prev) => Math.max(0, prev - 1));
+    try {
+      await callEdge(NOTIFY_FN, {
+        query: { action: 'delete' },
+        body: { user_id: profile.id, notification_id: notificationId },
+        retries: 0,
+      });
+    } catch (err) {
+      logError(err, { where: 'useNotifications.deleteNotification' }, 'warn');
+    }
+  }, [profile?.id, notifications]);
+
+  const deleteAll = useCallback(async () => {
+    if (!profile?.id) return;
+    setNotifications([]);
+    setUnreadCount(0);
+    try {
+      await callEdge(NOTIFY_FN, {
+        query: { action: 'delete' },
+        body: { user_id: profile.id, delete_all: true },
+        retries: 0,
+      });
+    } catch (err) {
+      logError(err, { where: 'useNotifications.deleteAll' }, 'warn');
+    }
+  }, [profile?.id]);
+
   // ── 생성 시작 알림 (진행 중) ─────────────────────────────────────────
   const sendGenerationInProgress = useCallback(async (params: {
     generation_type: string;
@@ -371,6 +402,8 @@ export function useNotifications() {
     fetchNotifications,
     markRead,
     markAllRead,
+    deleteNotification,
+    deleteAll,
     sendGenerationComplete,
     sendGenerationInProgress,
     completeGenerationNotif,
