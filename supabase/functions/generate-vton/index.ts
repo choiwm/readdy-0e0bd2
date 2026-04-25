@@ -2,6 +2,7 @@ import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
 import { requireUser, AuthFailure } from '../_shared/auth.ts';
 import { buildCorsHeaders, handlePreflight } from '../_shared/cors.ts';
 import { checkRateLimit, rateLimitedResponse, POLICIES } from '../_shared/rateLimit.ts';
+import { persistFalAsset } from '../_shared/fal_storage.ts';
 
 const VTON_CREDIT_COST_FALLBACK = 133;
 const VTON_WORKFLOW_MODEL_ID = 'workflows/fal-vton';
@@ -297,8 +298,10 @@ Deno.serve(async (req) => {
 
           if (resultRes.ok) {
             const resultData = await resultRes.json();
-            const videoUrl = resultData?.video?.url ?? resultData?.video_url ?? resultData?.url;
-            if (videoUrl) {
+            const rawVideoUrl = resultData?.video?.url ?? resultData?.video_url ?? resultData?.url;
+            if (rawVideoUrl) {
+              const ownerId = (body.save_opts?.user_id as string | undefined) ?? (body.save_opts?.session_id as string | undefined) ?? 'anon';
+              const videoUrl = await persistFalAsset(supabase, rawVideoUrl, 'video', ownerId);
               if (body.save_opts) {
                 const opts = body.save_opts;
                 const workId = `vton_${Date.now()}_${Math.random().toString(36).slice(2, 7)}`;
@@ -487,8 +490,9 @@ Deno.serve(async (req) => {
 
           if (resultRes.ok) {
             const resultData = await resultRes.json();
-            const videoUrl = resultData?.video?.url ?? resultData?.video_url ?? resultData?.url;
-            if (videoUrl) {
+            const rawVideoUrl = resultData?.video?.url ?? resultData?.video_url ?? resultData?.url;
+            if (rawVideoUrl) {
+              const videoUrl = await persistFalAsset(supabase, rawVideoUrl, 'video', user_id ?? session_id ?? 'anon');
               await logUsage(supabase, { userId: user_id, sessionId: session_id, serviceSlug: 'fal', action: 'VTON 가상 피팅', creditsDeducted: isVip ? 0 : VTON_CREDIT_COST, userPlan: plan, status: 'success', metadata: { attempts: attempt + 1, cost: VTON_CREDIT_COST, fal_request_id: resultFalReqId, billable_units: resultBillable } });
               const workId = `vton_${Date.now()}_${Math.random().toString(36).slice(2, 7)}`;
               await supabase.from('ad_works').insert({ id: workId, user_id: user_id ?? null, session_id: session_id ?? null, title: 'AI 가상 피팅', template_id: 'vton', template_title: 'Virtual Try-On', result_type: 'video', result_url: videoUrl, ratio: '9:16', resolution: '1K', format: 'MP4' }).catch(() => {});

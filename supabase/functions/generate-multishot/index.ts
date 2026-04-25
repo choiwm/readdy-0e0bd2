@@ -2,6 +2,7 @@ import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
 import { requireUser, AuthFailure } from '../_shared/auth.ts';
 import { buildCorsHeaders, handlePreflight } from '../_shared/cors.ts';
 import { checkRateLimit, rateLimitedResponse, POLICIES } from '../_shared/rateLimit.ts';
+import { persistFalAsset } from '../_shared/fal_storage.ts';
 
 const MULTISHOT_CREDIT_COST_FALLBACK = 180;
 const MULTISHOT_MODEL_ID = 'workflows/kling-multi-shot-creator';
@@ -351,7 +352,7 @@ async function actionGenImage(body: Record<string, unknown>, supabase: ReturnTyp
 }
 
 async function actionPollImage(body: Record<string, unknown>, supabase: ReturnType<typeof createClient>) {
-  const { job_id, request_id } = body as { job_id: string; request_id: string };
+  const { job_id, request_id, user_id, session_id } = body as { job_id: string; request_id: string; user_id?: string; session_id?: string };
   const statusUrlFromPost = body.status_url as string | null | undefined;
   const responseUrlFromPost = body.response_url as string | null | undefined;
 
@@ -382,8 +383,9 @@ async function actionPollImage(body: Record<string, unknown>, supabase: ReturnTy
           return new Response(JSON.stringify({ status: 'FAILED', error: '이미지가 콘텐츠 정책에 위반됐어요. 프롬프트를 수정해주세요.' }), { headers: { ...corsHeaders, "Content-Type": "application/json" } });
         }
 
-        const imageUrl = resultData?.images?.[0]?.url;
-        if (imageUrl) {
+        const rawImageUrl = resultData?.images?.[0]?.url;
+        if (rawImageUrl) {
+          const imageUrl = await persistFalAsset(supabase, rawImageUrl, 'image', user_id ?? session_id ?? job_id);
           await supabase.from('ad_works').update({ step_status: { step: 'image_done', base_image_url: imageUrl } }).eq('id', job_id);
           return new Response(JSON.stringify({ status: 'COMPLETED', image_url: imageUrl }), { headers: { ...corsHeaders, "Content-Type": "application/json" } });
         }
@@ -439,7 +441,7 @@ async function actionGenVideo(body: Record<string, unknown>, supabase: ReturnTyp
 }
 
 async function actionPollVideo(body: Record<string, unknown>, supabase: ReturnType<typeof createClient>) {
-  const { request_id, shot_index } = body as { job_id: string; request_id: string; shot_index: number };
+  const { request_id, shot_index, job_id, user_id, session_id } = body as { job_id: string; request_id: string; shot_index: number; user_id?: string; session_id?: string };
   const statusUrlFromPost = body.status_url as string | null | undefined;
   const responseUrlFromPost = body.response_url as string | null | undefined;
 
@@ -462,8 +464,9 @@ async function actionPollVideo(body: Record<string, unknown>, supabase: ReturnTy
     if (ok) {
       try {
         const resultData = JSON.parse(resultText);
-        const videoUrl = resultData?.video?.url ?? resultData?.video_url;
-        if (videoUrl) {
+        const rawVideoUrl = resultData?.video?.url ?? resultData?.video_url;
+        if (rawVideoUrl) {
+          const videoUrl = await persistFalAsset(supabase, rawVideoUrl, 'video', user_id ?? session_id ?? job_id ?? 'anon');
           return new Response(JSON.stringify({ status: 'COMPLETED', video_url: videoUrl, shot_index }), { headers: { ...corsHeaders, "Content-Type": "application/json" } });
         }
       } catch { /* JSON 파싱 실패 → IN_PROGRESS */ }
@@ -558,7 +561,7 @@ async function actionConvertToMp4(body: Record<string, unknown>, supabase: Retur
 }
 
 async function actionPollConvert(body: Record<string, unknown>, supabase: ReturnType<typeof createClient>) {
-  const { request_id } = body as { request_id: string };
+  const { request_id, job_id, user_id, session_id } = body as { request_id: string; job_id?: string; user_id?: string; session_id?: string };
   const statusUrlFromPost = body.status_url as string | null | undefined;
   const responseUrlFromPost = body.response_url as string | null | undefined;
 
@@ -579,8 +582,11 @@ async function actionPollConvert(body: Record<string, unknown>, supabase: Return
     if (ok) {
       try {
         const resultData = JSON.parse(resultText);
-        const mp4Url = resultData?.video?.url ?? resultData?.video_url ?? resultData?.url ?? resultData?.output?.url ?? resultData?.output_url;
-        if (mp4Url) return new Response(JSON.stringify({ status: 'COMPLETED', mp4_url: mp4Url }), { headers: { ...corsHeaders, "Content-Type": "application/json" } });
+        const rawMp4Url = resultData?.video?.url ?? resultData?.video_url ?? resultData?.url ?? resultData?.output?.url ?? resultData?.output_url;
+        if (rawMp4Url) {
+          const mp4Url = await persistFalAsset(supabase, rawMp4Url, 'video', user_id ?? session_id ?? job_id ?? 'anon');
+          return new Response(JSON.stringify({ status: 'COMPLETED', mp4_url: mp4Url }), { headers: { ...corsHeaders, "Content-Type": "application/json" } });
+        }
       } catch { /* JSON 파싱 실패 → FAILED */ }
     }
     return new Response(JSON.stringify({ status: 'FAILED', error: 'MP4 URL을 찾을 수 없습니다' }), { headers: { ...corsHeaders, "Content-Type": "application/json" } });
@@ -718,7 +724,10 @@ Deno.serve(async (req) => {
       case 'merge':
       case 'poll_merge': {
         const videoUrls = (body.video_urls as string[]) ?? [];
-        const fallback = videoUrls[0] ?? '';
+        const rawFallback = videoUrls[0] ?? '';
+        const fallback = rawFallback
+          ? await persistFalAsset(supabase, rawFallback, 'video', (body.user_id as string | undefined) ?? (body.session_id as string | undefined) ?? (body.job_id as string | undefined) ?? 'anon')
+          : rawFallback;
         if (body.job_id) await finalizeJob(supabase, body.job_id as string, fallback, body.user_id as string | undefined, body.session_id as string | undefined);
         return new Response(JSON.stringify({ status: 'COMPLETED', video_url: fallback }), { headers: { ...corsHeaders, "Content-Type": "application/json" } });
       }
