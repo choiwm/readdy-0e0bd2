@@ -794,12 +794,10 @@ export default function SyncPanel({ onDeductCredits, credits = 999, onRefundCred
 
                 <div className="space-y-2">
                   <p className="text-[9px] font-black text-zinc-600 uppercase tracking-widest mb-2">내보내기</p>
-                  <button
-                    onClick={() => showToast('영상 합성 내보내기는 준비 중입니다. SFX 파일을 개별 다운로드하여 영상 편집 툴에서 합성해 주세요.')}
-                    className="w-full flex items-center gap-2 px-3 py-2 rounded-lg bg-zinc-800/60 border border-white/5 text-[10px] text-zinc-400 hover:text-white hover:border-white/10 transition-all cursor-pointer"
-                  >
-                    <i className="ri-film-line text-xs" /> 영상에 합성하여 내보내기
-                  </button>
+                  {/* 영상 자동 합성은 서버 사이드 ffmpeg 가 필요해서 단계적으로
+                      구현 예정. 현재는 ZIP 으로 SFX 파일을 받아 외부 편집 툴
+                      (Premiere/DaVinci/CapCut) 에서 합성하는 정직한 안내만
+                      노출. (이전엔 가짜 버튼이 가짜 토스트만 띄웠어요) */}
                   <button
                     onClick={handleBulkDownload}
                     disabled={bulkDownloading || doneCount === 0}
@@ -811,18 +809,15 @@ export default function SyncPanel({ onDeductCredits, credits = 999, onRefundCred
                       <><i className="ri-folder-zip-line text-xs" /> SFX 파일 ZIP 다운로드</>
                     )}
                   </button>
+                  <p className="text-[9px] text-zinc-600 leading-relaxed">
+                    ZIP 받은 후 영상 편집 툴 (Premiere · DaVinci · CapCut) 에서 타임스탬프 기준으로 합성해주세요.
+                  </p>
                 </div>
               </div>
             </div>
 
-            {/* 모바일 전용 내보내기 버튼 */}
+            {/* 모바일 전용 내보내기 버튼 — 실제 동작하는 ZIP 다운로드만 노출 */}
             <div className="lg:hidden flex gap-2">
-              <button
-                onClick={() => showToast('영상 합성 내보내기는 준비 중입니다. SFX 파일을 개별 다운로드하여 영상 편집 툴에서 합성해 주세요.')}
-                className="flex-1 flex items-center justify-center gap-2 px-3 py-2.5 rounded-xl bg-zinc-800/60 border border-white/5 text-[10px] text-zinc-400 hover:text-white hover:border-white/10 transition-all cursor-pointer"
-              >
-                <i className="ri-film-line text-xs" /> 영상 합성 내보내기
-              </button>
               <button
                 onClick={handleBulkDownload}
                 disabled={bulkDownloading || doneCount === 0}
