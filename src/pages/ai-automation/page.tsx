@@ -18,9 +18,13 @@ import YouTubeConfigContent, {
 import EmbeddedYouTubeStudio from './components/EmbeddedYouTubeStudio';
 import AutopilotModal, { AUTOPILOT_STEPS } from './components/AutopilotModal';
 
-// Edge Function URLs
-const VIDEO_EDGE_FN = 'https://kkeijdddandmvsaukpcn.supabase.co/functions/v1/generate-video';
-const IMAGE_EDGE_FN = 'https://kkeijdddandmvsaukpcn.supabase.co/functions/v1/generate-image';
+import { SUPABASE_URL } from '@/lib/env';
+
+// Edge Function URLs — env var 기반으로 조립해야 환경 분기 (staging/prod) 가
+// 단일 빌드에서 동작해요. 이전 하드코딩은 organization URL 이 바뀌면 침묵
+// 실패함.
+const VIDEO_EDGE_FN = `${SUPABASE_URL}/functions/v1/generate-video`;
+const IMAGE_EDGE_FN = `${SUPABASE_URL}/functions/v1/generate-image`;
 
 // ── Sidebar icon rail items ────────────────────────────────────────────────
 const sidebarItems = [
@@ -172,7 +176,7 @@ export default function AIAutomationPage() {
       addLog('GoAPI TTS 엔진 초기화...');
       addLog(`${currentVoice.name} 음성 합성 중...`);
       try {
-        const ttsRes = await fetch('https://kkeijdddandmvsaukpcn.supabase.co/functions/v1/generate-tts', {
+        const ttsRes = await fetch(`${SUPABASE_URL}/functions/v1/generate-tts`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ text: `${autopilotTopic}에 대한 영상입니다.`, voiceName: currentVoice.name, model: 'flash' }),
