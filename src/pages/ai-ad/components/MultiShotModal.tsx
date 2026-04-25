@@ -799,6 +799,13 @@ export default function MultiShotModal({ onClose }: MultiShotModalProps) {
                       : '예상 3~5분 (영상 생성 중)'}
                   </span>
                 </div>
+
+                <button
+                  onClick={handleReset}
+                  className="mt-1 flex items-center gap-1.5 text-[11px] text-zinc-400 hover:text-rose-300 font-bold transition-colors cursor-pointer"
+                >
+                  <i className="ri-stop-circle-line" /> 생성 취소
+                </button>
               </div>
             </div>
           ) : pipelineState === 'error' ? (
