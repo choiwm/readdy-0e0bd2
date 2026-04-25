@@ -95,3 +95,37 @@ export async function persistFalAsset(
     return falUrl;
   }
 }
+
+/**
+ * Remove a previously-persisted asset from Storage. Called when a user
+ * deletes a gallery_item or ad_work — without this the Storage object
+ * stays around forever and we keep paying for it.
+ *
+ * Soft-fails like persistFalAsset — if the URL isn't ours, isn't parseable,
+ * or remove() errors, log and move on. The row deletion is the user-visible
+ * action; Storage cleanup is a janitorial side-effect.
+ */
+export async function removeFalAsset(
+  supabase: SupabaseLike,
+  url: string,
+): Promise<void> {
+  if (!url) return;
+  // Match …/object/public/generated-assets/<path> or …/object/sign/…
+  const m = url.match(/\/object\/(?:public|sign)\/generated-assets\/([^?]+)/);
+  if (!m || !m[1]) {
+    // Not in our bucket (could be a legacy fal.media URL or external) —
+    // nothing to clean.
+    return;
+  }
+  const path = decodeURIComponent(m[1]);
+  try {
+    const { error } = await supabase.storage.from(BUCKET).remove([path]);
+    if (error) {
+      console.warn(`[fal_storage] remove failed for ${path}: ${error.message}`);
+      return;
+    }
+    console.log(`[fal_storage] removed: ${path}`);
+  } catch (e) {
+    console.warn('[fal_storage] remove exception:', e instanceof Error ? e.message : String(e));
+  }
+}

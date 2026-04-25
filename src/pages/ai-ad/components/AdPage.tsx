@@ -429,7 +429,11 @@ export default function AdPage() {
     setDeleteConfirmId(null);
     setMyWorks((prev) => prev.filter((w) => w.id !== id));
     try {
-      await supabase.from('ad_works').delete().eq('id', id);
+      const { error } = await supabase.functions.invoke('delete-saved-asset', {
+        body: { id, kind: 'ad_work' },
+      });
+      // 게스트(anon) 세션이면 401 → 직접 DB 삭제로 fallback
+      if (error) await supabase.from('ad_works').delete().eq('id', id);
     } catch {
       // 조용히 실패
     }
