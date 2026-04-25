@@ -11,6 +11,7 @@ import VtonModal from './VtonModal';
 import MultiShotModal from './MultiShotModal';
 import { supabase } from '@/lib/supabase';
 import { useAuth } from '@/hooks/useAuth';
+import { ExpirableMedia } from '@/components/base/ExpirableMedia';
 
 type AdTab = '템플릿' | '내 작업';
 
@@ -116,23 +117,17 @@ function WorkPreviewModal({ work, onClose, onDelete }: { work: MyWorkItem; onClo
 
           {/* Media */}
           <div className="flex-1 overflow-hidden bg-black flex items-center justify-center" style={{ minHeight: '300px', maxHeight: '60vh' }}>
-            {work.result.type === 'video' ? (
-              <video
-                src={work.result.url}
-                className="w-full h-full object-contain"
-                autoPlay
-                muted
-                loop
-                playsInline
-                controls
-              />
-            ) : (
-              <img
-                src={work.result.url}
-                alt={work.title}
-                className="w-full h-full object-contain"
-              />
-            )}
+            <ExpirableMedia
+              type={work.result.type === 'video' ? 'video' : 'image'}
+              src={work.result.url}
+              alt={work.title}
+              className="w-full h-full object-contain"
+              autoPlay={work.result.type === 'video'}
+              muted={work.result.type === 'video'}
+              loop={work.result.type === 'video'}
+              playsInline={work.result.type === 'video'}
+              controls={work.result.type === 'video'}
+            />
           </div>
 
           {/* Footer */}
@@ -230,7 +225,8 @@ function WorkCard({ work, onDelete, onPreview }: { work: MyWorkItem; onDelete: (
             preload="metadata"
           />
         ) : (
-          <img
+          <ExpirableMedia
+            type="image"
             src={work.result.url}
             alt={work.title}
             className="w-full h-full object-cover object-top group-hover:scale-105 transition-transform duration-500"

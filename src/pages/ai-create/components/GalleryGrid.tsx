@@ -5,6 +5,7 @@ import { GalleryItem, GalleryItemSource } from '@/mocks/galleryItems';
 import RangeSlider from './RangeSlider';
 import EmptyState from '@/components/base/EmptyState';
 import PageHeader from '@/components/feature/PageHeader';
+import { ExpirableMedia } from '@/components/base/ExpirableMedia';
 
 // ── Image Detail Modal ─────────────────────────────────────────────────────
 interface ImageDetailModalProps {
@@ -101,16 +102,18 @@ function ImageDetailModal({
               <div className="w-10 h-10 rounded-full border-2 border-indigo-500/30 border-t-indigo-500 animate-spin" />
             </div>
           )}
-          {item.type === 'video' ? (
-            <video key={item.id} src={item.url} controls autoPlay={false} loop playsInline
-              onLoadedData={() => setImgLoaded(true)}
-              className={`max-w-full max-h-full object-contain transition-opacity duration-300 ${imgLoaded ? 'opacity-100' : 'opacity-0'}`}
-            />
-          ) : (
-            <img key={item.id} src={item.url} alt={item.prompt} onLoad={() => setImgLoaded(true)}
-              className={`max-w-full max-h-full object-contain transition-opacity duration-300 ${imgLoaded ? 'opacity-100' : 'opacity-0'}`}
-            />
-          )}
+          <ExpirableMedia
+            key={item.id}
+            type={item.type === 'video' ? 'video' : 'image'}
+            src={item.url}
+            alt={item.prompt}
+            controls={item.type === 'video'}
+            loop={item.type === 'video'}
+            playsInline={item.type === 'video'}
+            onLoad={() => setImgLoaded(true)}
+            onLoadedData={() => setImgLoaded(true)}
+            className={`max-w-full max-h-full object-contain transition-opacity duration-300 ${imgLoaded ? 'opacity-100' : 'opacity-0'}`}
+          />
           <div className="absolute top-3 left-3 flex items-center gap-1.5">
             <span className={`flex items-center gap-1 text-[10px] font-bold px-2 py-1 rounded-full border backdrop-blur-sm ${item.type === 'video' ? 'bg-indigo-500/20 border-indigo-500/30 text-indigo-300' : 'bg-black/50 border-white/10 text-zinc-300'}`}>
               <i className={item.type === 'video' ? 'ri-video-line' : 'ri-image-line'} />
@@ -855,7 +858,7 @@ export default function GalleryGrid({ onSelectItem, generatedItems = [], onItemA
               >
                 {item.type === 'video' ? (
                   <div className="w-full aspect-video bg-zinc-900 flex items-center justify-center relative">
-                    <video src={item.url} muted playsInline preload="metadata" className="w-full h-full object-cover" />
+                    <ExpirableMedia type="video" src={item.url} muted playsInline preload="metadata" className="w-full h-full object-cover" />
                     <div className="absolute inset-0 flex items-center justify-center bg-black/30">
                       <div className="w-10 h-10 rounded-full bg-white/20 backdrop-blur-sm flex items-center justify-center border border-white/30">
                         <i className="ri-play-fill text-white text-lg ml-0.5" />
@@ -863,7 +866,7 @@ export default function GalleryGrid({ onSelectItem, generatedItems = [], onItemA
                     </div>
                   </div>
                 ) : (
-                  <img src={item.url} alt={item.prompt} className="w-full object-cover" />
+                  <ExpirableMedia type="image" src={item.url} alt={item.prompt} className="w-full object-cover" />
                 )}
 
                 {/* NEW badge */}
@@ -951,13 +954,13 @@ export default function GalleryGrid({ onSelectItem, generatedItems = [], onItemA
                 <div className="w-12 h-12 md:w-16 md:h-16 rounded-lg overflow-hidden flex-shrink-0 bg-zinc-800 relative">
                   {item.type === 'video' ? (
                     <>
-                      <video src={item.url} muted playsInline preload="metadata" className="w-full h-full object-cover" />
+                      <ExpirableMedia type="video" src={item.url} muted playsInline preload="metadata" className="w-full h-full object-cover" />
                       <div className="absolute inset-0 flex items-center justify-center bg-black/40">
                         <i className="ri-play-fill text-white text-sm" />
                       </div>
                     </>
                   ) : (
-                    <img src={item.url} alt={item.prompt} className="w-full h-full object-cover" />
+                    <ExpirableMedia type="image" src={item.url} alt={item.prompt} className="w-full h-full object-cover" />
                   )}
                   {newItemIds.has(item.id) && (
                     <div className="absolute inset-0 flex items-end justify-center pb-1">
