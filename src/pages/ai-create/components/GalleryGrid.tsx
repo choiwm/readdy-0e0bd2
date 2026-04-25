@@ -866,7 +866,7 @@ export default function GalleryGrid({ onSelectItem, generatedItems = [], onItemA
                     </div>
                   </div>
                 ) : (
-                  <ExpirableMedia type="image" src={item.url} alt={item.prompt} className="w-full object-cover" />
+                  <ExpirableMedia type="image" src={item.url} alt={item.prompt} loading="lazy" className="w-full object-cover" />
                 )}
 
                 {/* NEW badge */}
@@ -960,7 +960,7 @@ export default function GalleryGrid({ onSelectItem, generatedItems = [], onItemA
                       </div>
                     </>
                   ) : (
-                    <ExpirableMedia type="image" src={item.url} alt={item.prompt} className="w-full h-full object-cover" />
+                    <ExpirableMedia type="image" src={item.url} alt={item.prompt} loading="lazy" className="w-full h-full object-cover" />
                   )}
                   {newItemIds.has(item.id) && (
                     <div className="absolute inset-0 flex items-end justify-center pb-1">
