@@ -347,6 +347,19 @@ Deno.serve(async (req) => {
                   result_type: 'video', result_url: videoUrl, ratio: '9:16', resolution: '1K', format: 'MP4',
                 }).catch(() => {});
               }
+              // PR #22 의 _refund 멱등성 검사가 metadata->>request_id 의 success
+              // 엔트리를 찾도록, _poll 모드 성공 시에도 usage_log 를 남겨요.
+              // (이전엔 _poll 성공이 row 만 만들고 log 는 비워뒀어요 — 만약 클라가
+              // 어떤 이유로 같은 request_id 로 _refund 를 또 부르면 중복 환불
+              // 가능성이 있었어요)
+              const ownerUserId = body.save_opts?.user_id as string | undefined;
+              const ownerSessionId = body.save_opts?.session_id as string | undefined;
+              await logUsage(supabase, {
+                userId: ownerUserId, sessionId: ownerSessionId, serviceSlug: 'fal',
+                action: 'VTON 가상 피팅',
+                creditsDeducted: 0, userPlan: 'unknown', status: 'success',
+                metadata: { client_poll: true, request_id: requestId, fal_request_id: resultReqId, billable_units: resultBillable },
+              });
               return respond({ videoUrl, status: 'COMPLETED', fal_request_id: resultReqId });
             }
           } else {
