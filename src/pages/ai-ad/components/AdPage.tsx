@@ -215,8 +215,9 @@ function WorkCard({ work, onDelete, onPreview }: { work: MyWorkItem; onDelete: (
     >
       <div className="relative h-[110px] sm:h-[130px] overflow-hidden">
         {work.result.type === 'video' ? (
-          <video
+          <ExpirableMedia
             ref={videoRef}
+            type="video"
             src={work.result.url}
             className="w-full h-full object-cover object-top"
             muted
