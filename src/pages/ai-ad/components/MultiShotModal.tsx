@@ -44,9 +44,9 @@ interface ShotStep {
 const SHOT_STEPS: ShotStep[] = [
   { label: 'Claude Opus — 샷 플랜 생성', icon: 'ri-sparkling-2-line', color: 'text-amber-400' },
   { label: 'FLUX Schnell — 첫 프레임 이미지', icon: 'ri-image-line', color: 'text-sky-400' },
-  { label: 'Kling v1.6 Pro — 샷 1 영상', icon: 'ri-movie-line', color: 'text-emerald-400' },
-  { label: 'Kling v1.6 Pro — 샷 2 영상', icon: 'ri-movie-line', color: 'text-emerald-400' },
-  { label: 'Kling v1.6 Pro — 샷 3 영상', icon: 'ri-movie-line', color: 'text-emerald-400' },
+  { label: 'Kling v2.1 Pro — 샷 1 영상', icon: 'ri-movie-line', color: 'text-emerald-400' },
+  { label: 'Kling v2.1 Pro — 샷 2 영상', icon: 'ri-movie-line', color: 'text-emerald-400' },
+  { label: 'Kling v2.1 Pro — 샷 3 영상', icon: 'ri-movie-line', color: 'text-emerald-400' },
 ];
 
 const EXAMPLE_PROMPTS = [
@@ -907,7 +907,7 @@ export default function MultiShotModal({ onClose }: MultiShotModalProps) {
                 {[
                   { icon: 'ri-sparkling-2-line', color: 'text-amber-400', label: 'Claude Opus 4.5', desc: '3개 샷 시나리오 자동 설계' },
                   { icon: 'ri-image-line', color: 'text-sky-400', label: 'FLUX Schnell', desc: '첫 프레임 이미지 생성' },
-                  { icon: 'ri-movie-line', color: 'text-emerald-400', label: 'Kling v1.6 Pro × 3', desc: '각 샷별 영상 생성 (5초씩)' },
+                  { icon: 'ri-movie-line', color: 'text-emerald-400', label: 'Kling v2.1 Pro × 3', desc: '각 샷별 영상 생성 (5초씩)' },
                   { icon: 'ri-play-circle-line', color: 'text-rose-400', label: '순차 재생 플레이어', desc: '샷 1→2→3 자동 전환 재생' },
                 ].map((item, i) => (
                   <div key={i} className="flex items-center gap-2.5">
@@ -999,7 +999,7 @@ export default function MultiShotModal({ onClose }: MultiShotModalProps) {
                     ? 'Claude 3.5 Haiku가 샷 플랜을 설계합니다 (10~30초)'
                     : pipelineState === 'gen_image' || pipelineState === 'poll_image'
                     ? 'FLUX Schnell로 첫 프레임 이미지를 생성합니다'
-                    : 'Kling v1.6 Pro 영상 생성 중 — 페이지를 닫으면 중단됩니다'}
+                    : 'Kling v2.1 Pro 영상 생성 중 — 페이지를 닫으면 중단됩니다'}
                 </p>
               </div>
             )}
