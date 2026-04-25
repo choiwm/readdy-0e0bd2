@@ -19,6 +19,8 @@ export interface ApiError {
   detail?: string;
   /** Localized actionable next step (from fal.ai parser). Shown below detail. */
   action?: string;
+  /** fal.ai request id surfaced for support tickets. */
+  falRequestId?: string | null;
   retryable: boolean;
 }
 
@@ -34,6 +36,7 @@ interface FalErrorPayload {
   is_retryable: boolean;
   http_status: number;
   fal_error_type: string | null;
+  fal_request_id?: string | null;
 }
 
 function isFalErrorPayload(x: unknown): x is FalErrorPayload {
@@ -70,6 +73,7 @@ export function parseApiError(err: unknown, rawMessage?: string): ApiError {
       message: err.message,
       detail: err.fal_error_type ? `fal.ai: ${err.fal_error_type}` : undefined,
       action: err.action,
+      falRequestId: err.fal_request_id ?? null,
       retryable: err.is_retryable,
     };
   }
@@ -283,6 +287,11 @@ export function ErrorBanner({ error, onRetry, onDismiss, variant = 'inline', cla
           )}
           {error.action && (
             <p className={`text-[11px] mt-1 leading-relaxed ${cfg.color} opacity-90`}>{error.action}</p>
+          )}
+          {error.falRequestId && (
+            <p className="text-[10px] text-zinc-600 mt-1.5 font-mono break-all">
+              요청 ID: {error.falRequestId}
+            </p>
           )}
 
           {/* 가이드 토글 */}

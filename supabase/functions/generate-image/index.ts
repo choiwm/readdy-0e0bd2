@@ -727,7 +727,7 @@ Deno.serve(async (req) => {
         let parsedBody: Record<string, unknown> = {};
         try { parsedBody = JSON.parse(resText); } catch { /* ignore */ }
         const parsed = parseFalError(res.status, parsedBody, res);
-        return respond(toClientPayload(parsed), res.status);
+        return respond(toClientPayload(parsed, getFalRequestId(res)), res.status);
       }
 
       if (res.ok) {
@@ -814,7 +814,7 @@ Deno.serve(async (req) => {
       let parsedBody: Record<string, unknown> = {};
       try { parsedBody = JSON.parse(queueText); } catch { /* ignore */ }
       const parsed = parseFalError(queueRes.status, parsedBody, queueRes);
-      return respond(toClientPayload(parsed), queueRes.status);
+      return respond(toClientPayload(parsed, getFalRequestId(queueRes)), queueRes.status);
     }
 
     if (!queueRes.ok) {
