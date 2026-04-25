@@ -49,7 +49,10 @@ export const MODEL_LABELS: Record<string, { name: string; badge: string; desc: s
   'fal-ai/kling-video/v1.5/pro/text-to-video':      { name: 'Kling v1.5 Pro',    badge: '고품질',  desc: '향상된 품질' },
   'fal-ai/kling-video/v2.1/standard/text-to-video': { name: 'Kling v2.1 Standard', badge: '최신',  desc: '최신 표준 모델' },
   'fal-ai/kling-video/v2.1/pro/text-to-video':      { name: 'Kling v2.1 Pro',    badge: '최고',    desc: '최신 최고 품질' },
-  'fal-ai/minimax-video/image-to-video':            { name: 'MiniMax Video',      badge: '대안',    desc: 'MiniMax 영상 모델' },
+  'fal-ai/kling-video/v2.5-turbo/pro/text-to-video':{ name: 'Kling v2.5 Turbo',   badge: '최신',    desc: '빠른 v2.5 turbo' },
+  'fal-ai/kling-video/v3/pro/text-to-video':        { name: 'Kling v3 Pro',       badge: 'Beta',    desc: '최신 v3 (preview)' },
+  'fal-ai/veo3':                                    { name: 'Google Veo 3',       badge: '대안',    desc: 'Google Veo 3' },
+  'fal-ai/minimax-video/image-to-video':            { name: 'MiniMax Video (i2v)', badge: 'i2v 전용', desc: 'MiniMax 영상 — image-to-video 전용' },
   'fal-ai/wan-t2v':                                 { name: 'WAN T2V',            badge: '대안',    desc: 'WAN 텍스트→영상' },
   'fal-ai/stable-audio':  { name: 'Stable Audio',  badge: 'fal.ai', desc: '고품질 음악 생성' },
   'fal-ai/musicgen':      { name: 'MusicGen',       badge: 'fal.ai', desc: 'Meta MusicGen' },
@@ -98,10 +101,19 @@ export const ALL_IMAGE_MODELS = [
   'fal-ai/flux/schnell', 'fal-ai/flux/dev', 'fal-ai/flux-pro',
   'fal-ai/flux-pro/v1.1', 'fal-ai/flux-pro/v1.1-ultra', 'fal-ai/stable-diffusion-v3-medium',
 ];
+// 백엔드의 supabase/functions/_shared/fal_video_models.ts 와 동기 유지.
+// 모두 t2v (텍스트→비디오) 경로 — admin 이 active_model 로 선택하면 백엔드가
+// 이미지 입력이 있을 때만 자동으로 i2v 경로로 매핑해요. 여기 i2v 경로를 직접
+// 노출하면 t2v 요청 시 422 가 발생해서 t2v 만 나열.
 export const ALL_VIDEO_MODELS = [
-  'fal-ai/kling-video/v1/standard/text-to-video', 'fal-ai/kling-video/v1.5/pro/text-to-video',
-  'fal-ai/kling-video/v2.1/standard/text-to-video', 'fal-ai/kling-video/v2.1/pro/text-to-video',
-  'fal-ai/minimax-video/image-to-video', 'fal-ai/wan-t2v',
+  'fal-ai/kling-video/v1/standard/text-to-video',
+  'fal-ai/kling-video/v1.5/pro/text-to-video',
+  'fal-ai/kling-video/v2.1/standard/text-to-video',
+  'fal-ai/kling-video/v2.1/pro/text-to-video',
+  'fal-ai/kling-video/v2.5-turbo/pro/text-to-video',
+  'fal-ai/kling-video/v3/pro/text-to-video',
+  'fal-ai/veo3',
+  'fal-ai/wan-t2v',
 ];
 export const ALL_FAL_MUSIC_MODELS = ['fal-ai/stable-audio', 'fal-ai/musicgen'];
 
