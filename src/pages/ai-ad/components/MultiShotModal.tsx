@@ -553,19 +553,26 @@ export default function MultiShotModal({ onClose }: MultiShotModalProps) {
       const jobId = initData.job_id as string;
       const shotPlan = initData.shot_plan as ShotPlan;
 
+      // 멀티샷 init 이후의 후속 액션들에 user_id/session_id 를 그대로 흘려보내요.
+      // 백엔드의 actionPollImage / actionPollVideo / actionPollConvert 가
+      // persistFalAsset 호출 시 owner ID 로 사용 → Storage 경로가
+      // image/<user_id>/... 형태로 일관되게 namespace 됩니다.
+      const owner = { user_id: profile?.id ?? null, session_id: getSessionId() };
+
       // ── Step 1: 이미지 생성 ──
       setPipelineState('gen_image');
       setCurrentStep(1);
       const imgData = await invokeAction('gen_image', {
         job_id: jobId,
         base_image_prompt: shotPlan.base_image_prompt,
+        ...owner,
       });
       const imageRequestId = imgData.request_id as string;
 
       setPipelineState('poll_image');
       const imgResult = await poll(
         async () => {
-          const d = await invokeAction('poll_image', { job_id: jobId, request_id: imageRequestId });
+          const d = await invokeAction('poll_image', { job_id: jobId, request_id: imageRequestId, ...owner });
           return d as { status: string; [key: string]: unknown };
         },
         IMAGE_POLL_MAX,
@@ -589,6 +596,7 @@ export default function MultiShotModal({ onClose }: MultiShotModalProps) {
           image_url: baseImageUrl,
           duration: shot.duration,
           shot_index: i,
+          ...owner,
         });
         const videoRequestId = vidData.request_id as string;
 
@@ -599,6 +607,7 @@ export default function MultiShotModal({ onClose }: MultiShotModalProps) {
               job_id: jobId,
               request_id: videoRequestId,
               shot_index: i,
+              ...owner,
             });
             return d as { status: string; [key: string]: unknown };
           },
