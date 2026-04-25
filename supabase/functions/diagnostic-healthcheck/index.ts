@@ -196,6 +196,7 @@ const VIDEO_PROBES = [
 // for the entire product lifetime — these probes catch that class of bug
 // the next time it happens.
 const PATH_VALIDATION_PROBES = [
+  // ── Video models ──────────────────────────────────────────────────────
   {
     task: 'path:kling-v2.1-pro/i2v (multishot)',
     modelKey: 'kling-v2.1-pro',
@@ -215,9 +216,41 @@ const PATH_VALIDATION_PROBES = [
     body: {},
   },
   {
+    task: 'path:veo3 (t2v)',
+    modelKey: 'veo3',
+    url: () => `https://queue.fal.run/fal-ai/veo3`,
+    body: {},
+  },
+  {
     task: 'path:vton workflow',
     modelKey: 'workflows/fal-vton',
     url: () => `https://queue.fal.run/workflows/fal-vton`,
+    body: {},
+  },
+  // ── Pipeline auxiliaries ──────────────────────────────────────────────
+  {
+    task: 'path:ffmpeg-api/compose (multishot mp4 convert)',
+    modelKey: 'ffmpeg-api/compose',
+    url: () => `https://queue.fal.run/fal-ai/ffmpeg-api/compose`,
+    body: {},
+  },
+  // ── Audio models ──────────────────────────────────────────────────────
+  {
+    task: 'path:playai-tts',
+    modelKey: 'playai-tts',
+    url: () => `https://queue.fal.run/fal-ai/playai-tts`,
+    body: {},
+  },
+  {
+    task: 'path:elevenlabs/sound-effects',
+    modelKey: 'elevenlabs/sound-effects',
+    url: () => `https://queue.fal.run/fal-ai/elevenlabs/sound-effects`,
+    body: {},
+  },
+  {
+    task: 'path:stable-audio (music)',
+    modelKey: 'stable-audio',
+    url: () => `https://queue.fal.run/fal-ai/stable-audio`,
     body: {},
   },
 ];
