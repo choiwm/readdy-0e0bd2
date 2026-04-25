@@ -151,6 +151,22 @@ Deno.serve(async (req) => {
         detail:       `상태: ${new_status ?? 'resolved'}`,
       });
 
+      // 사용자가 /my-account 안 들어와도 bell 에 답변 알림이 뜨도록 직접
+      // notifications insert. PR #28 이 답변 가시성을 추가했지만 사용자가
+      // 페이지를 안 열면 답변 받았는지 모름 — 푸시 채널 보강.
+      if (data.user_id) {
+        const titlePrefix = data.title ? `"${String(data.title).slice(0, 40)}" ` : '';
+        await supabase.from('notifications').insert({
+          user_id: data.user_id,
+          type: 'system_notice',
+          title: `문의 답변 도착`,
+          message: `${titlePrefix}문의에 운영팀 답변이 등록됐어요.`,
+          data: { action_url: '/my-account', ticket_id: id },
+        }).catch((e: unknown) => {
+          console.warn('[admin-cs] reply notification insert failed:', e);
+        });
+      }
+
       return json({ ticket: data });
     }
 
