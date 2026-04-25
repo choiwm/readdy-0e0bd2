@@ -50,7 +50,11 @@ const MODEL_DEFS: ModelDef[] = [
 
 const _models = MODEL_DEFS.map((m) => m.id);
 const ratios = ['1K · 16:9 · PNG', '4K · 1:1 · PNG', '2K · 9:16 · PNG'];
-const tabs = ['IMAGE', 'VIDEO', 'AVATAR', 'MODIFY'];
+// AVATAR / MODIFY 탭은 백엔드 미구현 — 노출하면 클릭 시 "곧 출시됩니다"
+// 토스트만 떠서 사용자가 혼란스러워해요. 구현 완료 시점에 다시 추가합니다.
+// 관련 dead code (TYPE_MULTIPLIERS.AVATAR, "준비 중" 배너 등) 는 일단 유지 —
+// 다음 PR 에서 한 번에 정리.
+const tabs: string[] = ['IMAGE', 'VIDEO'];
 
 // ── 크레딧 비용 테이블 ─────────────────────────────────────────────────────
 const MODEL_COSTS: Record<string, number> = Object.fromEntries(MODEL_DEFS.map((m) => [m.id, m.cost]));
