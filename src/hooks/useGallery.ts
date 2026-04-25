@@ -255,9 +255,15 @@ export function useGallery(userId?: string | null) {
     setItems((prev) => prev.filter((i) => i.id !== id));
     setTotalCount((c) => Math.max(0, c - 1));
     offsetRef.current = Math.max(0, offsetRef.current - 1);
-    const { error: err } = await supabase.from('gallery_items').delete().eq('id', id);
+    // Edge Function 경유: row 삭제와 함께 Supabase Storage 의 영상/이미지
+    // 파일도 같이 정리 (orphan 방지). 미인증 사용자 (anon row) 케이스는
+    // Edge Function 이 401 → 직접 DB 삭제로 fallback.
+    const { error: err } = await supabase.functions.invoke('delete-saved-asset', {
+      body: { id, kind: 'gallery' },
+    });
     if (err) {
-      fetchInitial(filter, sort, userId, sourceFilter);
+      const { error: directErr } = await supabase.from('gallery_items').delete().eq('id', id);
+      if (directErr) fetchInitial(filter, sort, userId, sourceFilter);
     }
   }, [filter, sort, userId, sourceFilter, fetchInitial]);
 
