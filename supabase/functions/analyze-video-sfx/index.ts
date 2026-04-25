@@ -157,6 +157,10 @@ Return ONLY a valid JSON array, no other text.`;
       temperature: 0.7,
     };
 
+    // GoAPI / OpenAI 호출에 timeout 명시. 누락 시 Supabase Edge Function 의
+    // 2분 wall 까지 hang — 사용자는 흰 화면 보다가 502.
+    const FETCH_TIMEOUT_MS = 30_000;
+
     // GoAPI 경유 시도
     if (GOAPI_KEY) {
       gptRes = await fetch("https://api.goapi.ai/v1/chat/completions", {
@@ -166,6 +170,7 @@ Return ONLY a valid JSON array, no other text.`;
           "Content-Type": "application/json",
         },
         body: JSON.stringify(gptBody),
+        signal: AbortSignal.timeout(FETCH_TIMEOUT_MS),
       });
 
       if (!gptRes.ok) {
@@ -179,6 +184,7 @@ Return ONLY a valid JSON array, no other text.`;
               "Content-Type": "application/json",
             },
             body: JSON.stringify(gptBody),
+            signal: AbortSignal.timeout(FETCH_TIMEOUT_MS),
           });
         }
       }
@@ -190,6 +196,7 @@ Return ONLY a valid JSON array, no other text.`;
           "Content-Type": "application/json",
         },
         body: JSON.stringify(gptBody),
+        signal: AbortSignal.timeout(FETCH_TIMEOUT_MS),
       });
     }
 
