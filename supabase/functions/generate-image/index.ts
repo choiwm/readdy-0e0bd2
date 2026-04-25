@@ -385,7 +385,7 @@ async function handlePollMode(
         const parsed = parseFalError(statusRes.status, parsedBody, statusRes);
         return new Response(JSON.stringify({
           status: 'FAILED',
-          ...toClientPayload(parsed),
+          ...toClientPayload(parsed, getFalRequestId(statusRes)),
           retryable: parsed.is_retryable,
         }), { headers: corsH });
       }
