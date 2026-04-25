@@ -280,12 +280,22 @@ export function parseFalError(
  * Keeps backward-compatible field names (error, fal_error_type, etc.) so
  * existing UI continues to work, but adds the new structured fields.
  */
-export function toClientPayload(parsed: FalErrorParsed): {
+export function toClientPayload(
+  parsed: FalErrorParsed,
+  /**
+   * Optional X-Fal-Request-Id from the upstream response. Surfacing it to
+   * the client lets users include it when reporting "내 영상이 안 만들어
+   * 져요" — admins can grep Supabase Logs / fal.ai dashboard by that exact
+   * id without guessing which timestamp.
+   */
+  falRequestId?: string | null,
+): {
   error: string;
   message: string;
   action: string;
   kind: FalErrorKind;
   fal_error_type: string | null;
+  fal_request_id: string | null;
   http_status: number;
   is_retryable: boolean;
 } {
@@ -295,6 +305,7 @@ export function toClientPayload(parsed: FalErrorParsed): {
     action: parsed.action_kr,
     kind: parsed.kind,
     fal_error_type: parsed.fal_error_type,
+    fal_request_id: falRequestId ?? null,
     http_status: parsed.http_status,
     is_retryable: parsed.is_retryable,
   };
