@@ -10,17 +10,70 @@ export type ApiErrorType =
   | 'server'        // 서버 오류 (5xx)
   | 'invalid_input' // 잘못된 입력
   | 'credit'        // 크레딧 부족
+  | 'content_policy'// fal.ai content moderation
   | 'unknown';      // 알 수 없는 오류
 
 export interface ApiError {
   type: ApiErrorType;
   message: string;
   detail?: string;
+  /** Localized actionable next step (from fal.ai parser). Shown below detail. */
+  action?: string;
   retryable: boolean;
 }
 
+// Edge Function 들이 실패 응답으로 보내는 toClientPayload(parseFalError(...)) shape.
+// parseApiError 가 이 모양을 인식하면 문자열 매칭을 건너뛰고 그대로 사용.
+interface FalErrorPayload {
+  kind:
+    | 'auth' | 'payment_required' | 'forbidden' | 'not_found'
+    | 'validation' | 'content_policy' | 'rate_limit' | 'quota'
+    | 'timeout' | 'server' | 'network' | 'unknown';
+  message: string;
+  action: string;
+  is_retryable: boolean;
+  http_status: number;
+  fal_error_type: string | null;
+}
+
+function isFalErrorPayload(x: unknown): x is FalErrorPayload {
+  if (!x || typeof x !== 'object') return false;
+  const r = x as Record<string, unknown>;
+  return typeof r.kind === 'string'
+    && typeof r.message === 'string'
+    && typeof r.action === 'string'
+    && typeof r.is_retryable === 'boolean';
+}
+
+const FAL_KIND_TO_TYPE: Record<FalErrorPayload['kind'], ApiErrorType> = {
+  auth: 'api_key',
+  payment_required: 'credit',
+  forbidden: 'api_key',
+  not_found: 'invalid_input',
+  validation: 'invalid_input',
+  content_policy: 'content_policy',
+  rate_limit: 'quota',
+  quota: 'quota',
+  timeout: 'timeout',
+  server: 'server',
+  network: 'network',
+  unknown: 'unknown',
+};
+
 // ── 에러 메시지 파싱 ───────────────────────────────────────────────────────
 export function parseApiError(err: unknown, rawMessage?: string): ApiError {
+  // Edge Function 이 toClientPayload 로 직렬화한 fal.ai 에러를 그대로 받았으면
+  // 문자열 매칭을 거치지 않고 한국어 action 필드를 그대로 노출.
+  if (isFalErrorPayload(err)) {
+    return {
+      type: FAL_KIND_TO_TYPE[err.kind] ?? 'unknown',
+      message: err.message,
+      detail: err.fal_error_type ? `fal.ai: ${err.fal_error_type}` : undefined,
+      action: err.action,
+      retryable: err.is_retryable,
+    };
+  }
+
   const msg = rawMessage ?? (err instanceof Error ? err.message : String(err));
   const lower = msg.toLowerCase();
 
@@ -154,6 +207,12 @@ const ERROR_CONFIG: Record<ApiErrorType, {
     bg: 'bg-rose-500/8',
     border: 'border-rose-500/25',
   },
+  content_policy: {
+    icon: 'ri-shield-cross-line',
+    color: 'text-pink-400',
+    bg: 'bg-pink-500/8',
+    border: 'border-pink-500/25',
+  },
   unknown: {
     icon: 'ri-question-line',
     color: 'text-zinc-400',
@@ -187,6 +246,9 @@ export function ErrorBanner({ error, onRetry, onDismiss, variant = 'inline', cla
           {error.detail && (
             <p className="text-[10px] text-zinc-500 mt-0.5 leading-relaxed">{error.detail}</p>
           )}
+          {error.action && (
+            <p className={`text-[10px] mt-0.5 leading-relaxed ${cfg.color} opacity-80`}>{error.action}</p>
+          )}
         </div>
         <div className="flex items-center gap-1.5 flex-shrink-0">
           {error.retryable && onRetry && (
@@ -218,6 +280,9 @@ export function ErrorBanner({ error, onRetry, onDismiss, variant = 'inline', cla
           <p className={`text-sm font-bold ${cfg.color} mb-0.5`}>{error.message}</p>
           {error.detail && (
             <p className="text-[11px] text-zinc-500 leading-relaxed">{error.detail}</p>
+          )}
+          {error.action && (
+            <p className={`text-[11px] mt-1 leading-relaxed ${cfg.color} opacity-90`}>{error.action}</p>
           )}
 
           {/* 가이드 토글 */}

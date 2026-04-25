@@ -422,7 +422,7 @@ async function handlePollMode(
       console.log(`[generate-image:poll] fal.status=${falStatus}, queue_pos=${statusData.queue_position ?? '-'}`);
 
       if (falStatus === 'COMPLETED') {
-        const resultRes = await fetch(resolvedResponseUrl, {
+        const resultRes: Response = await fetch(resolvedResponseUrl, {
           method: 'GET',
           headers: { 'Authorization': `Key ${FAL_KEY}` },
           signal: AbortSignal.timeout(30000),
@@ -506,6 +506,8 @@ async function handlePollMode(
               has_nsfw: extracted.hasNsfw,
               ad_work_id: adWorkId,
               image_url: extracted.url.slice(0, 100),
+              fal_request_id: getFalRequestId(resultRes),
+              billable_units: getBillableUnits(resultRes),
             },
           });
         }
@@ -742,7 +744,11 @@ Deno.serve(async (req) => {
           await logUsage(supabase, {
             userId: authedUserId, sessionId: session_id, serviceSlug: 'fal',
             action: `이미지 생성 (${model})`, creditsDeducted: 0, userPlan: 'test', status: 'success',
-            metadata: { model: falModel, ratio: normalizedRatio, source, has_nsfw: extracted.hasNsfw, image_to_image: useImageToImage },
+            metadata: {
+              model: falModel, ratio: normalizedRatio, source,
+              has_nsfw: extracted.hasNsfw, image_to_image: useImageToImage,
+              fal_request_id: falRequestId, billable_units: billableUnits,
+            },
           });
 
           let adWorkId: string | null = null;
@@ -802,7 +808,9 @@ Deno.serve(async (req) => {
 
     const queueText = await queueRes.text();
     const queueFalReqId = getFalRequestId(queueRes);
+    const queueBillableUnits = getBillableUnits(queueRes);
     if (queueFalReqId) console.log(`[generate-image] queue x-fal-request-id: ${queueFalReqId}`);
+    if (queueBillableUnits) console.log(`[generate-image] queue X-Fal-Billable-Units: ${queueBillableUnits}`);
     console.log(`[generate-image] Queue HTTP ${queueRes.status}: ${queueText.slice(0, 400)}`);
 
     if ([401, 402, 403, 404].includes(queueRes.status)) {
@@ -839,7 +847,11 @@ Deno.serve(async (req) => {
       await logUsage(supabase, {
         userId: authedUserId, sessionId: session_id, serviceSlug: 'fal',
         action: `이미지 생성 (${model})`, creditsDeducted: 0, userPlan: 'test', status: 'success',
-        metadata: { model: falModel, ratio: normalizedRatio, source, immediate: true, image_to_image: useImageToImage },
+        metadata: {
+          model: falModel, ratio: normalizedRatio, source, immediate: true,
+          image_to_image: useImageToImage,
+          fal_request_id: queueFalReqId, billable_units: queueBillableUnits,
+        },
       });
 
       let adWorkId: string | null = null;
