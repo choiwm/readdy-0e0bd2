@@ -197,8 +197,23 @@ export default function VtonModal({ onClose }: VtonModalProps) {
 
       if (data?.pending && data?.request_id) {
         setStep('영상 렌더링 완료 대기 중...');
-        finalUrl = await pollVtonResult(data.request_id, data.save_opts);
-        if (!finalUrl) throw new Error('가상 피팅 영상 생성 시간이 초과되었습니다 (15분). 잠시 후 다시 시도해주세요.');
+        // pending 핸드오프 후 클라이언트 폴링이 실패하면 서버는 알 수 없어서
+        // submit 시 차감된 credit 이 회수되지 않아요. 폴링 실패 시 환불 모드로
+        // 명시적 호출.
+        try {
+          finalUrl = await pollVtonResult(data.request_id, data.save_opts);
+          if (!finalUrl) throw new Error('가상 피팅 영상 생성 시간이 초과되었습니다 (15분). 잠시 후 다시 시도해주세요.');
+        } catch (pollErr) {
+          await supabase.functions.invoke('generate-vton', {
+            body: {
+              _refund: true,
+              request_id: data.request_id,
+              user_id: profile?.id ?? null,
+              session_id: getSessionId(),
+            },
+          }).catch(() => {});
+          throw pollErr;
+        }
       } else if (data?.videoUrl) {
         finalUrl = data.videoUrl;
       } else {
