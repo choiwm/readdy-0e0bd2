@@ -79,6 +79,11 @@ export default function MyAccountPage() {
             <PasswordResetButton email={profile.email} />
           </div>
 
+
+
+          {/* 내 문의 + 답변 */}
+          <MyInquiriesSection userId={profile.id} />
+
           {/* Danger zone */}
           <div className="bg-red-500/5 border border-red-500/25 rounded-2xl p-6">
             <h2 className="text-sm font-bold text-red-400 mb-2">계정 삭제</h2>
@@ -243,6 +248,115 @@ function DeleteAccountModal({
             </button>
           </div>
         </div>
+      </div>
+    </div>
+  );
+}
+
+// 사용자가 customer-support 페이지에서 보낸 문의에 admin 이 답변을 달면 (admin-cs
+// 의 reply_ticket 액션이 cs_tickets.reply_content / replied_at 을 채워요),
+// 이전엔 사용자가 그 답변을 어디서도 볼 수 없었어요. cs_tickets 의 RLS
+// (cs_tickets_select_own) 가 본인 row 만 SELECT 허용하고 있어서, 여기서 직접
+// 조회해 표시.
+interface CsTicket {
+  id: string;
+  category: string | null;
+  title: string | null;
+  body: string | null;
+  status: string | null;
+  reply_content: string | null;
+  replied_at: string | null;
+  created_at: string;
+}
+
+function MyInquiriesSection({ userId }: { userId: string }) {
+  const [tickets, setTickets] = useState<CsTicket[] | null>(null);
+  const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    (async () => {
+      const { data, error: err } = await supabase
+        .from('cs_tickets')
+        .select('id, category, title, body, status, reply_content, replied_at, created_at')
+        .eq('user_id', userId)
+        .order('created_at', { ascending: false })
+        .limit(20);
+      if (err) {
+        setError(err.message);
+        setTickets([]);
+        return;
+      }
+      setTickets((data ?? []) as CsTicket[]);
+    })();
+  }, [userId]);
+
+  if (tickets === null) {
+    return (
+      <div className="bg-zinc-900/40 border border-white/5 rounded-2xl p-6">
+        <h2 className="text-sm font-bold text-zinc-300 mb-3">내 문의 / 답변</h2>
+        <p className="text-xs text-zinc-500">불러오는 중...</p>
+      </div>
+    );
+  }
+
+  if (error) {
+    return (
+      <div className="bg-zinc-900/40 border border-white/5 rounded-2xl p-6">
+        <h2 className="text-sm font-bold text-zinc-300 mb-3">내 문의 / 답변</h2>
+        <p className="text-xs text-red-400">불러오기 실패: {error}</p>
+      </div>
+    );
+  }
+
+  if (tickets.length === 0) {
+    return (
+      <div className="bg-zinc-900/40 border border-white/5 rounded-2xl p-6">
+        <h2 className="text-sm font-bold text-zinc-300 mb-2">내 문의 / 답변</h2>
+        <p className="text-xs text-zinc-500 leading-relaxed">
+          아직 보내신 문의가 없어요. 문의는 <Link to="/customer-support" className="text-indigo-400 hover:underline">고객센터</Link> 에서 보낼 수 있어요.
+        </p>
+      </div>
+    );
+  }
+
+  return (
+    <div className="bg-zinc-900/40 border border-white/5 rounded-2xl p-6">
+      <div className="flex items-center justify-between mb-4">
+        <h2 className="text-sm font-bold text-zinc-300">내 문의 / 답변 ({tickets.length})</h2>
+        <Link to="/customer-support" className="text-[11px] text-indigo-400 hover:underline">새 문의 작성</Link>
+      </div>
+      <div className="space-y-3">
+        {tickets.map((t) => (
+          <div key={t.id} className="bg-zinc-950/60 border border-white/5 rounded-xl p-4">
+            <div className="flex items-center gap-2 flex-wrap mb-2">
+              <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full border ${
+                t.status === 'resolved'
+                  ? 'bg-emerald-500/10 border-emerald-500/30 text-emerald-300'
+                  : t.status === 'in_progress'
+                    ? 'bg-amber-500/10 border-amber-500/30 text-amber-300'
+                    : 'bg-zinc-700/40 border-zinc-600/40 text-zinc-400'
+              }`}>
+                {t.status === 'resolved' ? '답변 완료' : t.status === 'in_progress' ? '처리 중' : '접수됨'}
+              </span>
+              {t.category && (
+                <span className="text-[10px] text-zinc-500">{t.category}</span>
+              )}
+              <span className="text-[10px] text-zinc-600 ml-auto">
+                {new Date(t.created_at).toLocaleString('ko-KR')}
+              </span>
+            </div>
+            {t.title && <p className="text-sm font-bold text-white mb-1">{t.title}</p>}
+            {t.body && <p className="text-xs text-zinc-400 leading-relaxed whitespace-pre-wrap">{t.body}</p>}
+            {t.reply_content && (
+              <div className="mt-3 pt-3 border-t border-white/5 bg-indigo-500/5 -mx-4 -mb-4 px-4 pb-4 rounded-b-xl">
+                <p className="text-[10px] font-bold text-indigo-300 mb-1">
+                  운영팀 답변 {t.replied_at && `· ${new Date(t.replied_at).toLocaleString('ko-KR')}`}
+                </p>
+                <p className="text-xs text-zinc-200 leading-relaxed whitespace-pre-wrap">{t.reply_content}</p>
+              </div>
+            )}
+          </div>
+        ))}
       </div>
     </div>
   );
