@@ -235,6 +235,42 @@ Deno.serve(async (req) => {
       return respond({ cost });
     }
 
+    // ── 환불 모드 ─────────────────────────────────────────────────────
+    // Submit 시점에 차감된 credit 을 client polling 이 실패했을 때 회수해요.
+    // 함수가 timeout 임박으로 pending 응답을 돌려주면 그 이후의 폴링은 클라가
+    // 직접 fal.ai 결과를 본다 → 거기서 영구 실패가 발생하면 서버는 모르니까,
+    // 프런트가 이 모드로 명시적 환불 요청을 보내요. usage_logs 의 request_id
+    // 를 멱등 키로 사용해 중복 환불을 막아요.
+    if (body._refund && body.request_id) {
+      const requestId = body.request_id as string;
+      const { data: existingLogs } = await supabase
+        .from('usage_logs')
+        .select('status, metadata')
+        .eq('user_id', authedUserId)
+        .eq('service_slug', 'fal')
+        .filter('metadata->>request_id', 'eq', requestId);
+
+      const alreadyResolved = (existingLogs ?? []).some((r) => {
+        const m = (r.metadata ?? {}) as Record<string, unknown>;
+        return r.status === 'success' || m.refunded === true;
+      });
+      if (alreadyResolved) {
+        return respond({ ok: false, reason: 'already_resolved' });
+      }
+
+      const cost = await getVtonCreditCost(supabase);
+      const userIdForRefund = body.user_id as string | undefined ?? authedUserId;
+      const sessionIdForRefund = body.session_id as string | undefined;
+      await deductCredits(supabase, -cost, userIdForRefund, sessionIdForRefund);
+      await logUsage(supabase, {
+        userId: userIdForRefund, sessionId: sessionIdForRefund, serviceSlug: 'fal',
+        action: 'VTON 가상 피팅 환불 (클라이언트 폴링 실패)',
+        creditsDeducted: -cost, userPlan: 'unknown', status: 'failed',
+        metadata: { request_id: requestId, refunded: true, cost },
+      });
+      return respond({ ok: true, refunded: cost });
+    }
+
     // ── 폴링 모드 ─────────────────────────────────────────────────────
     if (body._poll && body.request_id) {
       let FAL_KEY = await getFalKey(supabase);
@@ -493,7 +529,7 @@ Deno.serve(async (req) => {
             const rawVideoUrl = resultData?.video?.url ?? resultData?.video_url ?? resultData?.url;
             if (rawVideoUrl) {
               const videoUrl = await persistFalAsset(supabase, rawVideoUrl, 'video', user_id ?? session_id ?? 'anon');
-              await logUsage(supabase, { userId: user_id, sessionId: session_id, serviceSlug: 'fal', action: 'VTON 가상 피팅', creditsDeducted: isVip ? 0 : VTON_CREDIT_COST, userPlan: plan, status: 'success', metadata: { attempts: attempt + 1, cost: VTON_CREDIT_COST, fal_request_id: resultFalReqId, billable_units: resultBillable } });
+              await logUsage(supabase, { userId: user_id, sessionId: session_id, serviceSlug: 'fal', action: 'VTON 가상 피팅', creditsDeducted: isVip ? 0 : VTON_CREDIT_COST, userPlan: plan, status: 'success', metadata: { attempts: attempt + 1, cost: VTON_CREDIT_COST, fal_request_id: resultFalReqId, billable_units: resultBillable, request_id: requestId } });
               const workId = `vton_${Date.now()}_${Math.random().toString(36).slice(2, 7)}`;
               await supabase.from('ad_works').insert({ id: workId, user_id: user_id ?? null, session_id: session_id ?? null, title: 'AI 가상 피팅', template_id: 'vton', template_title: 'Virtual Try-On', result_type: 'video', result_url: videoUrl, ratio: '9:16', resolution: '1K', format: 'MP4' }).catch(() => {});
               return respond({ success: true, videoUrl, credits_used: isVip ? 0 : VTON_CREDIT_COST });
