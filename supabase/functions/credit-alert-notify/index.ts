@@ -321,6 +321,27 @@ Deno.serve(async (req) => {
       return json({ success: true, marked: notification_id });
     }
 
+    // ── POST: 알림 삭제 ───────────────────────────────────────────────
+    if (req.method === 'POST' && action === 'delete') {
+      const body = await req.json();
+      const { user_id, notification_id, delete_all, type_filter } = body;
+      if (user_id && user_id !== authedUserId) return err('forbidden', 403);
+      if (!user_id) return err('user_id required');
+
+      if (delete_all) {
+        let query = supabase.from('notifications').delete().eq('user_id', user_id);
+        if (type_filter) query = query.eq('type', type_filter);
+        const { error } = await query;
+        if (error) return err(error.message);
+        return json({ success: true, deleted: 'all' });
+      }
+
+      if (!notification_id) return err('notification_id required');
+      const { error } = await supabase.from('notifications').delete().eq('id', notification_id).eq('user_id', user_id);
+      if (error) return err(error.message);
+      return json({ success: true, deleted: notification_id });
+    }
+
     // ── GET: 사용자 알림 설정 조회 ────────────────────────────────────
     if (req.method === 'GET' && action === 'get_settings') {
       const userId = url.searchParams.get('user_id');
