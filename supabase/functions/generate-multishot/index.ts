@@ -550,7 +550,13 @@ async function actionConvertToMp4(body: Record<string, unknown>, supabase: Retur
       'Content-Type': 'application/json',
       'X-Fal-Object-Lifecycle-Preference': JSON.stringify({ expiration_duration_seconds: 3600 }),
     },
-    body: JSON.stringify({ tracks: [{ id: 'main_video', type: 'video', keyframes: [{ url: video_url, timestamp: 0 }] }] }),
+    // fal-ai/ffmpeg-api/compose 의 output_format 을 명시. 누락 시 webm
+    // 입력에 대해 fal 이 추측하는데 컨버전이 일관되지 않을 수 있어요.
+    // ref: https://fal.ai/docs/model-api-reference (ffmpeg-api/compose)
+    body: JSON.stringify({
+      tracks: [{ id: 'main_video', type: 'video', keyframes: [{ url: video_url, timestamp: 0 }] }],
+      output_format: 'mp4',
+    }),
     signal: AbortSignal.timeout(15000),
   });
 
