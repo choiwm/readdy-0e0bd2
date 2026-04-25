@@ -4,6 +4,7 @@ import CreditCostPanel from './CreditCostPanel';
 import CreditAlertPanel from './CreditAlertPanel';
 import HealthCheckScheduler from './HealthCheckScheduler';
 import DiagnosticHealthcheckPanel from './DiagnosticHealthcheckPanel';
+import OrphanSweepPanel from './OrphanSweepPanel';
 import FailureLogsDrawer from './FailureLogsDrawer';
 import FalModelCatalog from './FalModelCatalog';
 import FalKeyManagerPanel from './FalKeyManagerPanel';
@@ -1272,7 +1273,10 @@ export default function AiEngineTab({
           SECTION: fal.ai 통합 진단 (end-to-end probe)
       ══════════════════════════════════════════════════════════════ */}
       {section === 'diagnostic' && (
-        <DiagnosticHealthcheckPanel isDark={isDark} onToast={onToast} />
+        <div className="space-y-4">
+          <DiagnosticHealthcheckPanel isDark={isDark} onToast={onToast} />
+          <OrphanSweepPanel isDark={isDark} onToast={onToast} />
+        </div>
       )}
 
       {/* ══════════════════════════════════════════════════════════════
