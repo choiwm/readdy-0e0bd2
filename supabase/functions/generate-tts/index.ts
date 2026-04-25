@@ -2,6 +2,7 @@ import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
 import { requireUser, AuthFailure } from '../_shared/auth.ts';
 import { buildCorsHeaders, handlePreflight } from '../_shared/cors.ts';
 import { checkRateLimit, rateLimitedResponse, POLICIES } from '../_shared/rateLimit.ts';
+import { persistFalAsset } from '../_shared/fal_storage.ts';
 
 const VIP_PLANS = ['enterprise', 'vip', 'admin'];
 const FAL_TTS_MODEL = "fal-ai/playai-tts";
@@ -302,7 +303,10 @@ Deno.serve(async (req) => {
 
       if (falRes.ok) {
         const falData = await falRes.json();
-        const audioUrl = falData?.audio?.url ?? falData?.audio_url ?? falData?.url;
+        const rawAudioUrl = falData?.audio?.url ?? falData?.audio_url ?? falData?.url;
+        const audioUrl = rawAudioUrl
+          ? await persistFalAsset(supabase, rawAudioUrl, 'audio', user_id ?? session_id ?? 'anon')
+          : rawAudioUrl;
         if (audioUrl) {
           const dur = Math.ceil(charCount / 15);
           await logUsage(supabase, { userId: user_id, sessionId: session_id, serviceSlug: 'fal', action: 'TTS 생성', creditsDeducted: isVip ? 0 : creditCost, userPlan: plan, status: 'success', metadata: { charCount, voiceName, model: ttsModel, fal_request_id: falReqId, billable_units: billableUnits } });

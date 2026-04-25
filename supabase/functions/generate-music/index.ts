@@ -2,6 +2,7 @@ import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
 import { requireUser, AuthFailure } from '../_shared/auth.ts';
 import { buildCorsHeaders, handlePreflight } from '../_shared/cors.ts';
 import { checkRateLimit, rateLimitedResponse, POLICIES } from '../_shared/rateLimit.ts';
+import { persistFalAsset } from '../_shared/fal_storage.ts';
 
 const VIP_PLANS = ['enterprise', 'vip', 'admin'];
 
@@ -555,7 +556,10 @@ Deno.serve(async (req) => {
       const falModel = musicSettings.active_model ?? 'fal-ai/stable-audio';
       console.log(`[generate-music] fal.ai 시도: model=${falModel}, duration=${duration}`);
       try {
-        const { url: audioUrl, falRequestId, billableUnits } = await generateWithFal(FAL_KEY, falModel, prompt, tags, duration);
+        const { url: rawAudioUrl, falRequestId, billableUnits } = await generateWithFal(FAL_KEY, falModel, prompt, tags, duration);
+        const audioUrl = rawAudioUrl
+          ? await persistFalAsset(supabase, rawAudioUrl, 'audio', user_id ?? session_id ?? 'anon')
+          : rawAudioUrl;
         if (audioUrl) {
           const clip = {
             id: String(Date.now()), title: title || prompt.slice(0, 40),

@@ -7,6 +7,7 @@ import {
   resolveVideoModel,
 } from '../_shared/fal_video_models.ts';
 import { parseFalError as parseFalErrorShared, toClientPayload } from '../_shared/fal_errors.ts';
+import { persistFalAsset } from '../_shared/fal_storage.ts';
 
 // Build per-direction lookup tables from the canonical registry. This keeps
 // the wire format unchanged (frontend still sends "kling-v1" etc.) while
@@ -365,17 +366,22 @@ async function pollOnce(
           if(!errInfo.isRetryable) return new Response(JSON.stringify({status:'FAILED',error:errInfo.message,fal_error_type:errInfo.errorType,retryable:false,model_errors:errInfo.modelErrors}),{headers:corsH});
         }
 
-        const videoUrl=extractVideoUrl(resultData);
-        console.log(`[generate-video:poll] videoUrl 추출: ${videoUrl?videoUrl.slice(0,100):'null'}`);
+        const rawVideoUrl=extractVideoUrl(resultData);
+        console.log(`[generate-video:poll] videoUrl 추출: ${rawVideoUrl?rawVideoUrl.slice(0,100):'null'}`);
         console.log(`[generate-video:poll] 전체 응답 키: ${Object.keys(resultData).join(', ')}`);
 
-        if (!videoUrl) {
+        if (!rawVideoUrl) {
           return new Response(JSON.stringify({
             status:'FAILED',
             error:`videoUrl을 찾을 수 없습니다. 응답 키: ${Object.keys(resultData).join(', ')}`,
             raw:JSON.stringify(resultData).slice(0,500),
           }),{headers:corsH});
         }
+
+        const videoUrl = await persistFalAsset(
+          supabase, rawVideoUrl, 'video',
+          (saveOpts?.user_id as string | undefined) ?? (saveOpts?.session_id as string | undefined) ?? 'anon',
+        );
 
         // DB 저장
         let adWorkId: string|null=null;
@@ -608,8 +614,9 @@ Deno.serve(async (req) => {
     try{falData=JSON.parse(falText);}catch{return respond({error:'fal.ai 응답 파싱 실패'},502);}
 
     // 즉시 완료 확인
-    const immediateUrl=extractVideoUrl(falData);
-    if(immediateUrl){
+    const rawImmediateUrl=extractVideoUrl(falData);
+    if(rawImmediateUrl){
+      const immediateUrl = await persistFalAsset(supabase, rawImmediateUrl, 'video', (user_id as string | undefined) ?? (session_id as string | undefined) ?? 'anon');
       console.log(`[generate-video] 즉시 완료: ${immediateUrl.slice(0,100)}`);
       await logUsage(supabase,{userId:user_id as string|undefined,sessionId:session_id as string|undefined,action:`영상 생성 완료 (${falModel}) - immediate`,status:'success',creditsDeducted:creditCost,metadata:{model:falModel,immediate:true}});
       const adWorkId=await saveResults(supabase,{videoUrl:immediateUrl,prompt:prompt as string,model:falModel,ratio:aspectRatio,userId:user_id as string|undefined,sessionId:session_id as string|undefined,source:source as string|undefined,templateId:template_id as string|undefined,templateTitle:template_title as string|undefined,resolution:resolution as string,format:format as string,productName:product_name as string|undefined,productDesc:product_desc as string|undefined});

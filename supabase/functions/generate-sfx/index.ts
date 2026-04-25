@@ -2,6 +2,7 @@ import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
 import { requireUser, AuthFailure } from '../_shared/auth.ts';
 import { buildCorsHeaders, handlePreflight } from '../_shared/cors.ts';
 import { checkRateLimit, rateLimitedResponse, POLICIES } from '../_shared/rateLimit.ts';
+import { persistFalAsset } from '../_shared/fal_storage.ts';
 
 const FAL_SFX_MODEL = "fal-ai/elevenlabs/sound-effects";
 const VIP_PLANS = ['enterprise', 'vip', 'admin'];
@@ -304,8 +305,11 @@ Deno.serve(async (req) => {
           return new Response(JSON.stringify({ success: true, audioBase64: base64Audio, mimeType: "audio/mpeg", duration: duration_seconds ?? null, credits_used: isVip ? 0 : SFX_CREDIT_COST }), { headers: { ...corsHeaders, "Content-Type": "application/json" } });
         }
         const falData = await falRes.json();
-        const audioUrl = falData?.audio?.url ?? falData?.audio_url ?? falData?.url;
+        const rawAudioUrl = falData?.audio?.url ?? falData?.audio_url ?? falData?.url;
         const audioBase64 = falData?.audio?.base64 ?? falData?.audio_base64;
+        const audioUrl = rawAudioUrl
+          ? await persistFalAsset(supabase, rawAudioUrl, 'audio', user_id ?? session_id ?? 'anon')
+          : rawAudioUrl;
         if (audioUrl) {
           await logUsage(supabase, { userId: user_id, sessionId: session_id, serviceSlug: 'fal', action: 'SFX 생성', creditsDeducted: isVip ? 0 : SFX_CREDIT_COST, userPlan: plan, status: 'success', metadata: { fal_request_id: falReqId, billable_units: billableUnits } });
           if (user_id) { await sendGenerationNotification({ userId: user_id, generationType: 'sfx', modelName: 'ElevenLabs SFX', creditsUsed: isVip ? 0 : SFX_CREDIT_COST, actionUrl: '/ai-sound', supabaseUrl: SUPABASE_URL, anonKey: ANON_KEY }); }
