@@ -704,8 +704,11 @@ export default function AdDetailModal({ template, productName, productDesc, side
   const handleDownload = useCallback(async () => {
     if (!result) return;
     try {
-      const response = await fetch(result.url);
+      // 만료된 URL 의 0 바이트 다운로드 방지 + 20s timeout.
+      const response = await fetch(result.url, { signal: AbortSignal.timeout(20_000) });
+      if (!response.ok) throw new Error(`HTTP ${response.status}`);
       const blob = await response.blob();
+      if (blob.size === 0) throw new Error('empty');
       const blobUrl = URL.createObjectURL(blob);
       const a = document.createElement('a');
       a.href = blobUrl;

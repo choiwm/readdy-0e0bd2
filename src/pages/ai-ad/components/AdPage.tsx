@@ -68,8 +68,12 @@ function WorkPreviewModal({ work, onClose, onDelete }: { work: MyWorkItem; onClo
 
   const handleDownload = async () => {
     try {
-      const response = await fetch(work.result.url);
+      // Storage URL hang 또는 만료된 fal.media URL 의 0 바이트 blob 방지.
+      // ok 체크 없이 blob() 하면 만료된 row 다운로드 시 빈 파일이 받아져요.
+      const response = await fetch(work.result.url, { signal: AbortSignal.timeout(20_000) });
+      if (!response.ok) throw new Error(`HTTP ${response.status}`);
       const blob = await response.blob();
+      if (blob.size === 0) throw new Error('empty');
       const blobUrl = URL.createObjectURL(blob);
       const a = document.createElement('a');
       a.href = blobUrl;
@@ -249,8 +253,10 @@ function WorkCard({ work, onDelete, onPreview }: { work: MyWorkItem; onDelete: (
             onClick={async (e) => {
               e.stopPropagation();
               try {
-                const response = await fetch(work.result.url);
+                const response = await fetch(work.result.url, { signal: AbortSignal.timeout(20_000) });
+                if (!response.ok) throw new Error(`HTTP ${response.status}`);
                 const blob = await response.blob();
+                if (blob.size === 0) throw new Error('empty');
                 const blobUrl = URL.createObjectURL(blob);
                 const a = document.createElement('a');
                 a.href = blobUrl;
