@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { logDev } from '@/lib/logger';
 import { supabase } from '@/lib/supabase';
+import { pollImageResult } from '@/pages/ai-ad/utils/falPolling';
 
 interface Props {
   prompt: string;
@@ -112,7 +113,20 @@ export default function GenerationStatus({
       if (!data) throw new Error('서버 응답이 없습니다.');
       if (data.error) throw new Error(String(data.error));
 
-      const imageUrl = data.imageUrl as string | undefined;
+      // generate-image 가 큐로 빠지면 pending 응답이 와서 폴링이 필요해요.
+      // 이전엔 imageUrl 없으면 즉시 실패 처리해서 비-schnell 모델은 거의 침묵 실패.
+      let imageUrl = data.imageUrl as string | undefined;
+      if (!imageUrl && data.pending && data.request_id) {
+        setMsg('이미지 렌더링 중... 큐 대기');
+        imageUrl = (await pollImageResult(
+          data.model as string,
+          data.request_id as string,
+          data.status_url as string | undefined,
+          data.response_url as string | undefined,
+          data.save_opts as Record<string, unknown> | undefined,
+        )) ?? undefined;
+      }
+      if (abortRef.current) return;
       if (!imageUrl) {
         throw new Error(`이미지 URL을 받지 못했습니다. 응답: ${JSON.stringify(data).slice(0, 100)}`);
       }
@@ -232,11 +246,24 @@ export default function GenerationStatus({
     setStep(1);
     setMsg('재시도: AI 서버 요청 중...');
 
-    supabase.functions.invoke('generate-image', { body: reqBody }).then(({ data, error }) => {
+    // 재시도 루트 — pending 응답까지 폴링.
+    (async () => {
+      const { data, error } = await supabase.functions.invoke('generate-image', { body: reqBody });
       if (abortRef.current) return;
       if (error) { stopTimer(); setErr(error.message); return; }
       if (!data || data.error) { stopTimer(); setErr(String(data?.error ?? '응답 없음')); return; }
-      const url = data.imageUrl as string | undefined;
+      let url = data.imageUrl as string | undefined;
+      if (!url && data.pending && data.request_id) {
+        setMsg('이미지 렌더링 중... 큐 대기');
+        url = (await pollImageResult(
+          data.model as string,
+          data.request_id as string,
+          data.status_url as string | undefined,
+          data.response_url as string | undefined,
+          data.save_opts as Record<string, unknown> | undefined,
+        )) ?? undefined;
+      }
+      if (abortRef.current) return;
       if (url) {
         setStep(2);
         setMsg('완료!');
@@ -248,7 +275,7 @@ export default function GenerationStatus({
         stopTimer();
         setErr('이미지 URL을 받지 못했습니다');
       }
-    });
+    })();
   };
 
   const color = isVideo ? 'text-amber-400' : 'text-indigo-400';
