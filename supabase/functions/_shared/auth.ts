@@ -173,10 +173,79 @@ export interface AuditLogOptions {
 }
 
 /**
+ * Audit-log actions worth alerting on. Anything that modifies money,
+ * deletes data, or grants/removes access goes here. Mirrors the
+ * action filter in audit_high_risk_7d view (migration 0008).
+ *
+ * When `writeAuditLog` is called for one of these AND the actor is
+ * super_admin (the only role that can do most of them), a Slack message
+ * is fired async. Non-fatal — alert failures never block the audit row
+ * write or the original request.
+ */
+const HIGH_RISK_ACTIONS: ReadonlySet<string> = new Set([
+  // API key rotations
+  '관리자 API 키 등록',
+  '관리자 API 키 회수',
+  // admin roster
+  '관리자 계정 생성',
+  '관리자 계정 수정',
+  '관리자 계정 삭제',
+  // user-level destructive ops
+  '코인 일괄 지급',
+  '회원 등급 변경',
+  '회원 플랜 변경',
+  '회원 계정 정지',
+  // billing
+  '결제 환불 처리',
+  // network
+  'IP 차단 등록',
+]);
+
+async function postSuperAdminSlack(
+  webhookUrl: string,
+  admin: AuthedAdmin,
+  action: string,
+  options: AuditLogOptions,
+): Promise<void> {
+  const lines = [
+    `*행동:* ${action}`,
+    `*대상:* ${options.target_label ?? options.target_id ?? '-'}`,
+    options.detail ? `*세부:* ${String(options.detail).slice(0, 200)}` : '',
+    `*결과:* ${options.result ?? 'success'}`,
+  ].filter(Boolean).join('\n');
+
+  const payload = {
+    blocks: [
+      { type: 'header', text: { type: 'plain_text', text: '🛡️ super_admin 행동 감지', emoji: true } },
+      { type: 'section', text: { type: 'mrkdwn', text:
+        `*${admin.email}* (super_admin) 가 high-risk 행동을 수행했어요.` } },
+      { type: 'section', text: { type: 'mrkdwn', text: lines } },
+      { type: 'context', elements: [{ type: 'mrkdwn',
+        text: `🕐 ${new Date().toLocaleString('ko-KR')} | audit_logs id 기록됨` }] },
+    ],
+  };
+
+  try {
+    await fetch(webhookUrl, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload),
+      signal: AbortSignal.timeout(8_000),
+    });
+  } catch {
+    // Slack 실패는 fire-and-forget — 원 행동 차단 X.
+  }
+}
+
+/**
  * Insert an audit-log row for a destructive or sensitive admin action.
  *
  * Admin identity (email) is pulled from the verified JWT via AuthedAdmin, not
  * from request body — requests cannot spoof who performed the action.
+ *
+ * Side effect: if `action` is in HIGH_RISK_ACTIONS AND the actor is
+ * super_admin AND ADMIN_AUDIT_SLACK_WEBHOOK_URL is set, an async Slack
+ * notification fires. Failures don't block the row insert.
  */
 export async function writeAuditLog(
   supabase: SupabaseClient<any, any, any>,
@@ -198,5 +267,16 @@ export async function writeAuditLog(
     });
   } catch {
     // audit 실패로 원 작업을 막지 않는다 — 배치 모니터링에서 탐지
+  }
+
+  // super_admin 의 high-risk 행동만 Slack 으로 즉시 알림. 다른 role 의
+  // 같은 action 은 그 role 의 정상 직무 범위라 제외 (예: cs 가 update_user_status
+  // 하는 건 자연스러움). DB 인서트 실패와 무관하게 시도해서 모니터링 누락
+  // 최소화.
+  if (admin.role === 'super_admin' && HIGH_RISK_ACTIONS.has(action)) {
+    const webhook = Deno.env.get('ADMIN_AUDIT_SLACK_WEBHOOK_URL');
+    if (webhook) {
+      void postSuperAdminSlack(webhook, admin, action, options);
+    }
   }
 }
