@@ -38,6 +38,7 @@ export default function AdminRosterPanel({ isDark, currentAdminId, onToast }: Pr
   const [inviteEmail, setInviteEmail] = useState('');
   const [inviteName, setInviteName] = useState('');
   const [inviteRole, setInviteRole] = useState<AdminRole>('cs');
+  const [sendInvite, setSendInvite] = useState(true);
   const [inviteError, setInviteError] = useState<string | null>(null);
   const [inviting, setInviting] = useState(false);
 
@@ -87,6 +88,7 @@ export default function AdminRosterPanel({ isDark, currentAdminId, onToast }: Pr
           email: inviteEmail.trim(),
           display_name: inviteName.trim() || undefined,
           role: inviteRole,
+          send_invite: sendInvite,
         }),
       });
       const data = await res.json();
@@ -94,14 +96,47 @@ export default function AdminRosterPanel({ isDark, currentAdminId, onToast }: Pr
         setInviteError(data?.error ?? `HTTP ${res.status}`);
         return;
       }
-      onToast(`${inviteEmail} 추가 완료 (${ADMIN_ROLE_LABELS[inviteRole]})`, 'success');
+      // 백엔드가 invite 결과를 함께 알려줘서 사용자에게 정확한 안내.
+      let toastMsg = `${inviteEmail} 추가 완료 (${ADMIN_ROLE_LABELS[inviteRole]})`;
+      if (data.invite_status === 'sent') {
+        toastMsg += ' — Magic-link 메일 발송됨';
+      } else if (data.invite_status === 'already_registered') {
+        toastMsg += ' — 이미 가입된 사용자라 invite 미발송';
+      } else if (data.invite_status === 'failed') {
+        toastMsg += ` — 메일 발송 실패: ${data.invite_error ?? '알 수 없음'}`;
+      }
+      onToast(toastMsg, data.invite_status === 'failed' ? 'warning' : 'success');
       setInviteOpen(false);
       setInviteEmail('');
       setInviteName('');
       setInviteRole('cs');
+      setSendInvite(true);
       await fetchAdmins();
     } finally {
       setInviting(false);
+    }
+  };
+
+  const handleResendInvite = async (target: AdminRow) => {
+    setBusyId(target.id);
+    try {
+      const res = await fetch(`${SECURITY_FN}?action=resend_invite`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', Authorization: getAuthorizationHeader() },
+        body: JSON.stringify({ email: target.email }),
+      });
+      const data = await res.json();
+      if (!res.ok) {
+        onToast(data?.error ?? `HTTP ${res.status}`, 'error');
+        return;
+      }
+      if (data.status === 'already_registered') {
+        onToast(data.hint ?? '이미 가입된 사용자에요.', 'info');
+      } else {
+        onToast(`${target.email} 에게 magic-link 재발송됨`, 'success');
+      }
+    } finally {
+      setBusyId(null);
     }
   };
 
@@ -251,6 +286,14 @@ export default function AdminRosterPanel({ isDark, currentAdminId, onToast }: Pr
                     ))}
                   </select>
                   <button
+                    onClick={() => handleResendInvite(a)}
+                    disabled={isBusy}
+                    title="Magic-link 메일 재발송"
+                    className="px-3 py-1.5 rounded-lg text-[11px] font-bold border border-indigo-500/30 text-indigo-300 hover:bg-indigo-500/10 transition-all disabled:opacity-50"
+                  >
+                    invite 재발송
+                  </button>
+                  <button
                     onClick={() => handleToggleActive(a)}
                     disabled={isBusy}
                     className={`px-3 py-1.5 rounded-lg text-[11px] font-bold border transition-all ${
@@ -317,6 +360,19 @@ export default function AdminRosterPanel({ isDark, currentAdminId, onToast }: Pr
               </select>
               <p className={`text-[10px] ${faintText} leading-relaxed`}>{ROLE_DESCRIPTIONS[inviteRole]}</p>
             </div>
+            <label className="flex items-start gap-2 cursor-pointer">
+              <input
+                type="checkbox"
+                checked={sendInvite}
+                onChange={(e) => setSendInvite(e.target.checked)}
+                className="mt-0.5 cursor-pointer"
+              />
+              <span className={`text-[11px] ${subText} leading-relaxed`}>
+                Magic-link 메일 자동 발송 — 받는 사람이 클릭하면 가입 후 자동으로 admin 패널 진입.
+                <br />
+                <span className={`text-[10px] ${faintText}`}>이미 가입한 사용자라면 안 보내도 됨 (직접 admin-login 가능).</span>
+              </span>
+            </label>
             {inviteError && (
               <div className="rounded-lg bg-red-500/10 border border-red-500/30 px-3 py-2 text-xs text-red-300">{inviteError}</div>
             )}

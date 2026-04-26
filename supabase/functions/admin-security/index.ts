@@ -142,7 +142,7 @@ Deno.serve(async (req) => {
     // 관리자 계정 생성
     if (req.method === 'POST' && action === 'create_admin') {
       const body = await req.json();
-      const { email, display_name, role, permissions } = body;
+      const { email, display_name, role, permissions, send_invite = true } = body;
       if (!email || !role) return err('email and role required');
       if (!['super_admin', 'ops', 'cs', 'billing'].includes(role)) {
         return err('role must be super_admin / ops / cs / billing');
@@ -170,7 +170,38 @@ Deno.serve(async (req) => {
         detail: `역할: ${role}`,
       });
 
-      return json({ admin: data }, 201);
+      // Magic-link 자동 발송 (선택). 받는 사람이 가입 안 한 상태면 가입 +
+      // 자동 로그인 + /admin 으로 redirect. 이미 가입한 사용자면 ALREADY_REGISTERED
+      // 에러가 나는데 그건 정상 — 그냥 admin-login 으로 직접 로그인하면 돼요.
+      let invite_status: 'sent' | 'already_registered' | 'failed' | 'skipped' = 'skipped';
+      let invite_error: string | undefined;
+      if (send_invite) {
+        const adminRedirectBase = Deno.env.get('ADMIN_INVITE_REDIRECT_URL')
+          ?? 'http://localhost:5173/admin';
+        try {
+          const inviteRes = await supabase.auth.admin.inviteUserByEmail(email, {
+            redirectTo: adminRedirectBase,
+          });
+          if (inviteRes.error) {
+            const msg = inviteRes.error.message ?? '';
+            // Supabase 의 already-registered 에러는 invite 가 needed 하지 않은
+            // 정상 케이스 — admin row 만 만들었으니 사용자가 직접 로그인하면 됨.
+            if (/already.*registered|already.*exist|user.*exist/i.test(msg)) {
+              invite_status = 'already_registered';
+            } else {
+              invite_status = 'failed';
+              invite_error = msg;
+            }
+          } else {
+            invite_status = 'sent';
+          }
+        } catch (e) {
+          invite_status = 'failed';
+          invite_error = e instanceof Error ? e.message : String(e);
+        }
+      }
+
+      return json({ admin: data, invite_status, invite_error }, 201);
     }
 
     // 관리자 계정 수정
@@ -229,6 +260,36 @@ Deno.serve(async (req) => {
       });
 
       return json({ admin: data });
+    }
+
+    // Magic-link 재발송 — 처음 invite 메일을 못 받았거나 만료됐을 때.
+    if (req.method === 'POST' && action === 'resend_invite') {
+      const body = await req.json();
+      const { email } = body;
+      if (!email) return err('email required');
+
+      const adminRedirectBase = Deno.env.get('ADMIN_INVITE_REDIRECT_URL')
+        ?? 'http://localhost:5173/admin';
+      try {
+        const inviteRes = await supabase.auth.admin.inviteUserByEmail(email, {
+          redirectTo: adminRedirectBase,
+        });
+        if (inviteRes.error) {
+          const msg = inviteRes.error.message ?? '';
+          if (/already.*registered|already.*exist|user.*exist/i.test(msg)) {
+            return json({ ok: true, status: 'already_registered',
+              hint: '이미 가입된 사용자에요. /admin-login 에서 직접 로그인하세요.' });
+          }
+          return err(msg);
+        }
+        await writeAuditLog(supabase, admin, '관리자 invite 재발송', {
+          target_type: 'security',
+          target_label: email,
+        });
+        return json({ ok: true, status: 'sent' });
+      } catch (e) {
+        return err(e instanceof Error ? e.message : String(e));
+      }
     }
 
     // 관리자 계정 삭제
