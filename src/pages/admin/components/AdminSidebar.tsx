@@ -10,7 +10,8 @@ export type AdminTabType =
   | 'audit'
   | 'sys-settings'
   | 'security'
-  | 'grade-settings';
+  | 'grade-settings'
+  | 'admin-roster';
 
 export interface NavItem {
   id: AdminTabType;

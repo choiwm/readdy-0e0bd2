@@ -144,6 +144,9 @@ Deno.serve(async (req) => {
       const body = await req.json();
       const { email, display_name, role, permissions } = body;
       if (!email || !role) return err('email and role required');
+      if (!['super_admin', 'ops', 'cs', 'billing'].includes(role)) {
+        return err('role must be super_admin / ops / cs / billing');
+      }
 
       const { data, error } = await supabase
         .from('admin_accounts')
@@ -175,6 +178,33 @@ Deno.serve(async (req) => {
       const body = await req.json();
       const { id, display_name, role, permissions, is_active, two_factor_enabled } = body;
       if (!id) return err('id required');
+      if (role !== undefined && !['super_admin', 'ops', 'cs', 'billing'].includes(role)) {
+        return err('role must be super_admin / ops / cs / billing');
+      }
+
+      // 자기 자신 다운그레이드/비활성화 차단 — 자기-lockout 방지.
+      if (id === admin.adminId) {
+        if (is_active === false) return err('cannot deactivate yourself', 403);
+        if (role !== undefined && role !== 'super_admin') return err('cannot downgrade yourself', 403);
+      }
+
+      // 마지막 super_admin 보호. role downgrade 또는 deactivate 시 카운트
+      // 후 0 이 되면 admin 패널 자체가 잠겨요 (admin 관리 = super_admin only).
+      if ((role !== undefined && role !== 'super_admin') || is_active === false) {
+        const { data: targetRow } = await supabase
+          .from('admin_accounts')
+          .select('role')
+          .eq('id', id)
+          .maybeSingle();
+        if (targetRow?.role === 'super_admin') {
+          const { count } = await supabase
+            .from('admin_accounts')
+            .select('id', { count: 'exact', head: true })
+            .eq('role', 'super_admin')
+            .eq('is_active', true);
+          if ((count ?? 0) <= 1) return err('cannot remove the last active super_admin', 403);
+        }
+      }
 
       const updateData: Record<string, unknown> = { updated_at: new Date().toISOString() };
       if (display_name !== undefined)       updateData.display_name       = display_name;
@@ -205,9 +235,31 @@ Deno.serve(async (req) => {
     if (req.method === 'DELETE' && action === 'delete_admin') {
       const id = url.searchParams.get('id');
       if (!id) return err('id required');
+      if (id === admin.adminId) return err('cannot delete yourself', 403);
+
+      const { data: targetRow } = await supabase
+        .from('admin_accounts')
+        .select('role, email')
+        .eq('id', id)
+        .maybeSingle();
+      if (targetRow?.role === 'super_admin') {
+        const { count } = await supabase
+          .from('admin_accounts')
+          .select('id', { count: 'exact', head: true })
+          .eq('role', 'super_admin')
+          .eq('is_active', true);
+        if ((count ?? 0) <= 1) return err('cannot delete the last active super_admin', 403);
+      }
 
       const { error } = await supabase.from('admin_accounts').delete().eq('id', id);
       if (error) return err(error.message);
+
+      await writeAuditLog(supabase, admin, '관리자 계정 삭제', {
+        target_type: 'security',
+        target_id: id,
+        target_label: targetRow?.email ?? id,
+      });
+
       return json({ success: true });
     }
 

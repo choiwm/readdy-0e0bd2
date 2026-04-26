@@ -27,6 +27,7 @@ const TAB_TITLES: Record<AdminTabType, string> = {
   audit:            '감사 로그',
   'sys-settings':   '시스템 설정',
   security:         '보안 / 2FA 관리',
+  'admin-roster':   'Admin 관리',
 };
 
 const CSV_TAB_LABELS: Partial<Record<AdminTabType, string>> = {
