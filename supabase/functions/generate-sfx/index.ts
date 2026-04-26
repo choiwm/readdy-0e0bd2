@@ -3,6 +3,7 @@ import { requireUser, AuthFailure } from '../_shared/auth.ts';
 import { buildCorsHeaders, handlePreflight } from '../_shared/cors.ts';
 import { checkRateLimit, rateLimitedResponse, POLICIES } from '../_shared/rateLimit.ts';
 import { persistFalAsset } from '../_shared/fal_storage.ts';
+import { parseFalError as parseFalErrorShared, toClientPayload, getFalRequestId } from '../_shared/fal_errors.ts';
 
 const FAL_SFX_MODEL = "fal-ai/elevenlabs/sound-effects";
 const VIP_PLANS = ['enterprise', 'vip', 'admin'];
@@ -272,13 +273,16 @@ Deno.serve(async (req) => {
       const retryableHeader = getFalRetryableHeader(falRes);
       if (falReqId) console.log(`[generate-sfx] x-fal-request-id: ${falReqId}`);
 
-      if (falRes.status === 401) {
+      // 401/403 을 구조화된 fal payload 로 — ErrorBanner 가 한국어 action_kr
+      // + fal_request_id 자동 노출 (다른 generate-* 함수와 동일).
+      if (falRes.status === 401 || falRes.status === 403) {
         if (!isVip) await deductCredits(supabase, -SFX_CREDIT_COST, user_id, session_id);
-        return new Response(JSON.stringify({ error: `fal.ai 인증 실패 (HTTP 401). API 키가 올바른지 확인하세요. fal.ai/dashboard/keys에서 키를 재발급해주세요.` }), { status: 401, headers: { ...corsHeaders, "Content-Type": "application/json" } });
-      }
-      if (falRes.status === 403) {
-        if (!isVip) await deductCredits(supabase, -SFX_CREDIT_COST, user_id, session_id);
-        return new Response(JSON.stringify({ error: `fal.ai 권한 없음 (HTTP 403). API 키의 scope를 확인하세요. fal.ai/dashboard/keys에서 API scope 키를 생성해주세요.` }), { status: 403, headers: { ...corsHeaders, "Content-Type": "application/json" } });
+        const errBody = await falRes.json().catch(() => ({}));
+        const parsed = parseFalErrorShared(falRes.status, errBody, falRes);
+        return new Response(
+          JSON.stringify(toClientPayload(parsed, getFalRequestId(falRes))),
+          { status: falRes.status, headers: { ...corsHeaders, "Content-Type": "application/json" } },
+        );
       }
 
       // errors.md: 422 Model Validation Error — 폴백 없이 사용자에게 명확히 전달
