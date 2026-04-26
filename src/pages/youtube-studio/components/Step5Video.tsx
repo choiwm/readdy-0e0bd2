@@ -1,6 +1,7 @@
 import { useState, useRef, useEffect, useCallback } from 'react';
 import { useNotifications } from '@/hooks/useNotifications';
 import { useAuth } from '@/hooks/useAuth';
+import { pollFalVideoResult } from '@/pages/ai-ad/utils/falPolling';
 import VideoPlayer from './VideoPlayer';
 import NarrationTimeline from './NarrationTimeline';
 import ImageTimeline from './ImageTimeline';
@@ -201,13 +202,29 @@ export default function Step5Video({ onNext, onBack, voiceData, initialCuts: ini
         const detail = data?.error || data?.detail || error.message;
         throw new Error(detail);
       }
-      if (!data?.success || !data?.videoUrl) {
+
+      // generate-video 가 큐로 빠지면 pending 응답을 돌려줘요. 이전엔 성공/실패
+      // 두 분기로만 처리해서 큐 응답이 항상 실패로 떨어졌어요. Step4Image 가
+      // PR #40 에서 같은 패턴으로 고친 건데 Step5Video 가 빠져 있었어요.
+      let finalVideoUrl: string | null = null;
+      if (data?.success && data?.videoUrl) {
+        finalVideoUrl = data.videoUrl as string;
+      } else if (data?.pending && data?.request_id) {
+        finalVideoUrl = await pollFalVideoResult(
+          data.model as string,
+          data.request_id as string,
+          data.status_url as string | undefined,
+          data.response_url as string | undefined,
+          data.save_opts as Record<string, unknown> | undefined,
+        );
+      }
+      if (!finalVideoUrl) {
         throw new Error(data?.error || '영상 생성에 실패했습니다.');
       }
 
       setCuts((prev) => prev.map((c) =>
         c.id === id
-          ? { ...c, thumb: s4?.image ?? c.thumb, hasVideo: true, videoUrl: data.videoUrl }
+          ? { ...c, thumb: s4?.image ?? c.thumb, hasVideo: true, videoUrl: finalVideoUrl }
           : c
       ));
       completeGenerationNotif({
@@ -278,10 +295,22 @@ export default function Step5Video({ onNext, onBack, voiceData, initialCuts: ini
           throw new Error(detail);
         }
 
+        let bulkVideoUrl: string | null = null;
         if (data?.success && data?.videoUrl) {
+          bulkVideoUrl = data.videoUrl as string;
+        } else if (data?.pending && data?.request_id) {
+          bulkVideoUrl = await pollFalVideoResult(
+            data.model as string,
+            data.request_id as string,
+            data.status_url as string | undefined,
+            data.response_url as string | undefined,
+            data.save_opts as Record<string, unknown> | undefined,
+          );
+        }
+        if (bulkVideoUrl) {
           setCuts((prev) => prev.map((c) =>
             c.id === cut.id
-              ? { ...c, thumb: s4?.image ?? c.thumb, hasVideo: true, videoUrl: data.videoUrl }
+              ? { ...c, thumb: s4?.image ?? c.thumb, hasVideo: true, videoUrl: bulkVideoUrl }
               : c
           ));
         } else if (data?.error) {
