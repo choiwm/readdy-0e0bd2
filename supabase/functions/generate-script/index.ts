@@ -124,6 +124,8 @@ ${channelStr}
       max_tokens: 1500,
       temperature: 0.8,
     }),
+    // 누락 시 GoAPI 가 hang 하면 Edge Function 의 2분 wall 까지 대기 후 502.
+    signal: AbortSignal.timeout(45_000),
   });
 
   if (!response.ok) {

@@ -123,6 +123,7 @@ async function sendGenerationNotification(opts: {
           credits_used: opts.creditsUsed,
           action_url: opts.actionUrl,
         }),
+        signal: AbortSignal.timeout(10_000),
       }
     );
   } catch {
@@ -235,6 +236,7 @@ Deno.serve(async (req) => {
           method: "POST",
           headers: { "Authorization": `Key ${FAL_KEY}` },
           body: uploadForm,
+          signal: AbortSignal.timeout(60_000),
         });
 
         let audioUrl: string | null = null;
@@ -258,6 +260,7 @@ Deno.serve(async (req) => {
               chunk_level: "segment",
               version: "3",
             }),
+            signal: AbortSignal.timeout(90_000),
           });
 
           if (falRes.ok) {
@@ -318,6 +321,7 @@ Deno.serve(async (req) => {
       method: "POST",
       headers: { "Authorization": `Bearer ${GOAPI_KEY}`, "x-api-key": GOAPI_KEY },
       body: whisperForm,
+      signal: AbortSignal.timeout(90_000),
     });
 
     if (!whisperRes.ok) {
@@ -330,6 +334,7 @@ Deno.serve(async (req) => {
         method: "POST",
         headers: { "x-api-key": GOAPI_KEY },
         body: whisperForm2,
+        signal: AbortSignal.timeout(90_000),
       });
     }
 
@@ -345,7 +350,10 @@ Deno.serve(async (req) => {
     if (taskId) {
       for (let attempt = 0; attempt < 60; attempt++) {
         await new Promise((r) => setTimeout(r, 3000));
-        const pollRes = await fetch(`https://api.goapi.ai/api/v1/task/${taskId}`, { headers: { "x-api-key": GOAPI_KEY } });
+        const pollRes = await fetch(`https://api.goapi.ai/api/v1/task/${taskId}`, {
+          headers: { "x-api-key": GOAPI_KEY },
+          signal: AbortSignal.timeout(15_000),
+        });
         if (!pollRes.ok) continue;
         const pollData = await pollRes.json();
         const status = pollData?.status ?? pollData?.data?.status;
