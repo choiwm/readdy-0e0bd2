@@ -213,6 +213,7 @@ async function testOpenRouterKey(rawKey: string): Promise<{ success: boolean; me
         'HTTP-Referer': 'https://readdy.ai',
         'X-Title': 'Readdy AI',
       },
+      signal: AbortSignal.timeout(15_000),
     });
     if (res.ok) {
       const data = await res.json();
@@ -236,6 +237,7 @@ async function testApiKey(slug: string, rawKey: string): Promise<{ success: bool
         method: 'POST',
         headers: { 'Authorization': `Key ${rawKey}`, 'Content-Type': 'application/json' },
         body: JSON.stringify({ prompt: 'white square', image_size: { width: 64, height: 64 }, num_images: 1, num_inference_steps: 1 }),
+        signal: AbortSignal.timeout(20_000),
       });
       if (res.status === 401 || res.status === 403) {
         return { success: false, message: `fal.ai 인증 실패 (HTTP ${res.status}) — 키를 확인해주세요` };
@@ -248,6 +250,7 @@ async function testApiKey(slug: string, rawKey: string): Promise<{ success: bool
       try {
         const balRes = await fetch('https://api.goapi.ai/api/v1/user/balance', {
           headers: { 'x-api-key': rawKey },
+          signal: AbortSignal.timeout(15_000),
         });
         if (balRes.ok) {
           const data = await balRes.json();
@@ -264,6 +267,7 @@ async function testApiKey(slug: string, rawKey: string): Promise<{ success: bool
         method: 'POST',
         headers: { 'x-api-key': rawKey, 'Content-Type': 'application/json' },
         body: JSON.stringify({ model: 'flux-realism', prompt: 'test', image_size: { width: 64, height: 64 } }),
+        signal: AbortSignal.timeout(20_000),
       });
       if (imgRes.status === 401 || imgRes.status === 403) {
         return { success: false, message: `GoAPI 인증 실패 (HTTP ${imgRes.status})` };
@@ -274,6 +278,7 @@ async function testApiKey(slug: string, rawKey: string): Promise<{ success: bool
     if (slug === 'elevenlabs') {
       const res = await fetch('https://api.elevenlabs.io/v1/user', {
         headers: { 'xi-api-key': rawKey },
+        signal: AbortSignal.timeout(15_000),
       });
       if (res.ok) {
         const data = await res.json();
@@ -293,6 +298,7 @@ async function testApiKey(slug: string, rawKey: string): Promise<{ success: bool
         method: 'POST',
         headers: { 'x-api-key': rawKey, 'Content-Type': 'application/json' },
         body: JSON.stringify({ custom_mode: false, prompt: 'test', mv: 'chirp-v3-5', wait_audio: false }),
+        signal: AbortSignal.timeout(15_000),
       });
       if (res.status === 401 || res.status === 403) return { success: false, message: `Suno API 인증 실패 (HTTP ${res.status})` };
       return { success: true, message: `Suno API 키 인증 성공 (HTTP ${res.status})` };
@@ -301,6 +307,7 @@ async function testApiKey(slug: string, rawKey: string): Promise<{ success: bool
     if (slug === 'openai') {
       const res = await fetch('https://api.openai.com/v1/models', {
         headers: { 'Authorization': `Bearer ${rawKey}` },
+        signal: AbortSignal.timeout(15_000),
       });
       if (res.ok) {
         const data = await res.json();
@@ -319,6 +326,7 @@ async function testApiKey(slug: string, rawKey: string): Promise<{ success: bool
         const res = await fetch('https://www.lalal.ai/api/preview/', {
           method: 'POST',
           headers: { 'Authorization': `license ${rawKey}` },
+          signal: AbortSignal.timeout(15_000),
         });
         if (res.status === 401 || res.status === 403) return { success: false, message: `LALAL.AI 인증 실패 (HTTP ${res.status})` };
         return { success: true, message: `LALAL.AI 키 인증 성공 (HTTP ${res.status})` };

@@ -64,6 +64,7 @@ Do not add any explanations, notes, or extra content.`;
         temperature: 0.3,
         max_tokens: 4000,
       }),
+      signal: AbortSignal.timeout(30_000),
     });
 
     if (!res.ok) {

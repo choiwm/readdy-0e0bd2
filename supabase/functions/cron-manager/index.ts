@@ -158,6 +158,7 @@ Deno.serve(async (req) => {
                 'apikey': serviceRoleKey,
               },
               body: '{}',
+              signal: AbortSignal.timeout(10_000),
             }
           );
 
@@ -192,6 +193,7 @@ Deno.serve(async (req) => {
                 'apikey': serviceRoleKey,
               },
               body: JSON.stringify({ p_limit: 20 }),
+              signal: AbortSignal.timeout(10_000),
             }
           );
           if (runsRes.ok) {
@@ -273,6 +275,7 @@ Deno.serve(async (req) => {
             'Content-Type': 'application/json',
           },
           body: JSON.stringify({ query: sqlCommand }),
+          signal: AbortSignal.timeout(10_000),
         }
       );
 
