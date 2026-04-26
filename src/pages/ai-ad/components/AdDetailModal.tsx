@@ -375,9 +375,10 @@ export default function AdDetailModal({ template, productName, productDesc, side
       if (type === 'image') {
         // ── 이미지 생성 (image-to-image or text-to-image) ──
         advanceStep(); // "씬 구성 중..." or "광고 씬 구성 중..."
-        // ai-ad 이미지 생성: Flux Dev (주) - DB 활성 모델과 일치
-        // 제품이미지 있는 경우만 redux (i2i) 사용
-        const adImageModel = primaryImageUrl ? 'Nano Banana 3' : 'Nano Banana 3'; // fal-ai/flux/dev
+        // ai-ad 이미지 생성: Flux Dev. 제품 이미지 유무는 image_url 동봉 여부로
+        // 백엔드에 전달되고, 백엔드가 자동으로 i2i 변형 (entry.i2i) 으로
+        // 매핑해요. 이전 ternary 는 두 분기가 같은 값이라 의도가 모호했음.
+        const adImageModel = 'Nano Banana 3'; // fal-ai/flux/dev (i2i 자동 라우팅)
         const { data, error } = await supabase.functions.invoke('generate-image', {
           body: {
             prompt,
