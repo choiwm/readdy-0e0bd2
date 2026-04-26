@@ -2,6 +2,7 @@ import { useState, useRef, useEffect, useCallback } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { supabase } from '@/lib/supabase';
 import AdminToast, { type ToastItem } from './components/AdminToast';
+import { useAdminRole } from '@/components/feature/AdminGuard';
 import TicketReplyModal from './components/TicketReplyModal';
 import PushMailModal from './components/PushMailModal';
 import PromptEditModal from './components/PromptEditModal';
@@ -51,10 +52,42 @@ import {
 // ── Types ──────────────────────────────────────────────────────────────────
 type TabType = 'overview' | 'users' | 'coin-grant' | 'content' | 'ai-engine' | 'billing' | 'cs' | 'cs-notice' | 'audit' | 'sys-settings' | 'security' | 'grade-settings';
 
+// Server-side requireAdmin in each Edge Function is the security boundary
+// (migration 0007 + auth.ts allowedRoles). The map below is purely UX —
+// hide tabs the role can't use so users don't get confused 403s.
+import type { AdminRole } from '@/components/feature/AdminGuard';
+const VISIBLE_TABS_BY_ROLE: Record<AdminRole, ReadonlySet<TabType>> = {
+  super_admin: new Set<TabType>([
+    'overview', 'users', 'coin-grant', 'grade-settings',
+    'content', 'ai-engine', 'billing', 'cs', 'cs-notice',
+    'audit', 'sys-settings', 'security',
+  ]),
+  ops: new Set<TabType>([
+    'overview', 'users', 'content', 'ai-engine', 'cs-notice', 'audit', 'sys-settings',
+  ]),
+  cs: new Set<TabType>([
+    'overview', 'users', 'coin-grant', 'content', 'cs', 'cs-notice',
+  ]),
+  billing: new Set<TabType>([
+    'overview', 'users', 'billing',
+  ]),
+};
+
 // ── Main ───────────────────────────────────────────────────────────────────
 export default function AdminPage() {
   const navigate = useNavigate();
+  const { role: adminRole } = useAdminRole();
+  const visibleTabs = VISIBLE_TABS_BY_ROLE[adminRole];
   const [activeTab, setActiveTab] = useState<TabType>('overview');
+
+  // 사용자가 URL 직접 입력 또는 다른 role 권한이었던 시절의 localStorage 등으로
+  // 자기 role 에 보이지 않는 탭을 active 로 가지면 첫 허용 탭으로 자동 전환.
+  useEffect(() => {
+    if (!visibleTabs.has(activeTab)) {
+      const fallback = Array.from(visibleTabs)[0] ?? 'overview';
+      setActiveTab(fallback as TabType);
+    }
+  }, [activeTab, visibleTabs]);
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [isDark, setIsDark] = useState(true);
   const {
@@ -742,8 +775,8 @@ export default function AdminPage() {
           onCloseSidebar={() => setSidebarOpen(false)}
           activeTab={activeTab}
           setActiveTab={setActiveTab}
-          navItems={navItems}
-          systemNavItems={systemNavItems}
+          navItems={navItems.filter((item) => visibleTabs.has(item.id))}
+          systemNavItems={systemNavItems.filter((item) => visibleTabs.has(item.id as TabType))}
           apiHealthData={apiHealthData}
           onSignOut={async () => {
             await supabase.auth.signOut();

@@ -14,7 +14,9 @@ Deno.serve(async (req) => {
   const err = (msg: string, status = 400) => json({ error: msg }, status);
   let admin: AuthedAdmin;
   try {
-    admin = await requireAdmin(req);
+    // 진입은 모든 admin 허용 (조회는 누구나) — 삭제/PII 노출은 핸들러 내부에서
+    // 다시 체크. super_admin 만 destructive 가능하도록.
+    admin = await requireAdmin(req, ['super_admin', 'ops', 'cs', 'billing']);
   } catch (e) {
     if (e instanceof AuthFailure) return e.response;
     throw e;
@@ -141,6 +143,7 @@ Deno.serve(async (req) => {
     // 사용자 상태 변경
     // ─────────────────────────────────────────────
     if (req.method === 'PATCH' && action === 'update_user_status') {
+      if (admin.role !== 'super_admin' && admin.role !== 'cs') return err('forbidden_role: super_admin or cs only', 403);
       const body = await req.json();
       const { id, status, reason } = body;
       if (!id || !status) return err('id and status required');
@@ -168,6 +171,7 @@ Deno.serve(async (req) => {
     // 회원 등급 변경
     // ─────────────────────────────────────────────
     if (req.method === 'PATCH' && action === 'update_member_grade') {
+      if (admin.role !== 'super_admin') return err('forbidden_role: super_admin only', 403);
       const body = await req.json();
       const { id, member_grade, reason } = body;
       if (!id || !member_grade) return err('id and member_grade required');
@@ -211,6 +215,7 @@ Deno.serve(async (req) => {
     // 등급 권한 업데이트 (라벨/설명 포함)
     // ─────────────────────────────────────────────
     if (req.method === 'PUT' && action === 'update_grade_permissions') {
+      if (admin.role !== 'super_admin') return err('forbidden_role: super_admin only', 403);
       const body = await req.json();
       const { grade, permissions } = body;
       if (!grade || !permissions) return err('grade and permissions required');
@@ -276,6 +281,7 @@ Deno.serve(async (req) => {
     // 크레딧 수동 지급/차감 (단일 유저)
     // ─────────────────────────────────────────────
     if (req.method === 'POST' && action === 'adjust_credits') {
+      if (admin.role !== 'super_admin' && admin.role !== 'cs') return err('forbidden_role: super_admin or cs only', 403);
       const body = await req.json();
       const { id, amount, reason } = body;
       if (!id || amount === undefined) return err('id and amount required');
@@ -313,6 +319,8 @@ Deno.serve(async (req) => {
     // 코인 일괄 지급 (플랜별 / 전체 / 등급별)
     // ─────────────────────────────────────────────
     if (req.method === 'POST' && action === 'grant_credits') {
+      // 일괄 지급은 영향 범위 커서 super_admin only.
+      if (admin.role !== 'super_admin') return err('forbidden_role: super_admin only', 403);
       const body = await req.json();
       const { amount, reason, target_type, target_value } = body;
       // target_type: 'all' | 'plan' | 'grade' | 'user_ids'
@@ -376,6 +384,7 @@ Deno.serve(async (req) => {
     // 사용자 플랜 변경
     // ─────────────────────────────────────────────
     if (req.method === 'PATCH' && action === 'update_user_plan') {
+      if (admin.role !== 'super_admin') return err('forbidden_role: super_admin only', 403);
       const body = await req.json();
       const { id, plan } = body;
       if (!id || !plan) return err('id and plan required');
@@ -433,6 +442,7 @@ Deno.serve(async (req) => {
     // 사용자 메모 업데이트
     // ─────────────────────────────────────────────
     if (req.method === 'PATCH' && action === 'update_user_notes') {
+      if (admin.role !== 'super_admin' && admin.role !== 'cs') return err('forbidden_role: super_admin or cs only', 403);
       const body = await req.json();
       const { id, notes } = body;
       if (!id) return err('id required');

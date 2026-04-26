@@ -35,9 +35,14 @@ export interface AuthedUser {
   jwt: string;
 }
 
+/** 4-tier admin role enum, mirroring the SQL admin_role type (migration 0007). */
+export type AdminRole = 'super_admin' | 'ops' | 'cs' | 'billing';
+
+export const ALL_ADMIN_ROLES: readonly AdminRole[] = ['super_admin', 'ops', 'cs', 'billing'];
+
 export interface AuthedAdmin extends AuthedUser {
   adminId: string;
-  role: string | null;
+  role: AdminRole;
 }
 
 /**
@@ -71,9 +76,20 @@ export async function requireUser(req: Request): Promise<AuthedUser> {
 
 /**
  * Verifies the caller is a user AND is listed as an active admin in admin_accounts.
- * Throws AuthFailure with 401 (no auth) or 403 (not admin).
+ *
+ * Pass `allowedRoles` to scope an endpoint to a subset of admin roles. The
+ * default (no argument) means "any active admin" which is what the legacy
+ * call sites used. New endpoints SHOULD pass an explicit allowlist — even
+ * if it's all four roles, the explicit choice surfaces the policy decision.
+ *
+ * Returns 403 with `{error: 'forbidden_role', required_roles}` when the
+ * caller is admin but not in the allowed set, so the frontend can render
+ * a precise message instead of the generic "관리자만 접근 가능" copy.
  */
-export async function requireAdmin(req: Request): Promise<AuthedAdmin> {
+export async function requireAdmin(
+  req: Request,
+  allowedRoles?: readonly AdminRole[],
+): Promise<AuthedAdmin> {
   const user = await requireUser(req);
 
   const supabaseUrl = Deno.env.get('SUPABASE_URL');
@@ -97,7 +113,19 @@ export async function requireAdmin(req: Request): Promise<AuthedAdmin> {
     throw new AuthFailure(jsonResponse({ error: "forbidden" }, 403, req));
   }
 
-  return { ...user, adminId: data.id, role: data.role ?? null };
+  // After migration 0007 role is NOT NULL, but defensive cast for legacy
+  // rows that haven't migrated yet (e.g. older deploy hitting newer client).
+  const role = (data.role ?? 'super_admin') as AdminRole;
+
+  if (allowedRoles && allowedRoles.length > 0 && !allowedRoles.includes(role)) {
+    throw new AuthFailure(jsonResponse({
+      error: 'forbidden_role',
+      required_roles: allowedRoles,
+      caller_role: role,
+    }, 403, req));
+  }
+
+  return { ...user, adminId: data.id, role };
 }
 
 /**
@@ -159,6 +187,7 @@ export async function writeAuditLog(
   try {
     await supabase.from('audit_logs').insert({
       admin_email: admin.email,
+      actor_role: admin.role,
       action,
       target_type: options.target_type ?? null,
       target_id: options.target_id ?? null,

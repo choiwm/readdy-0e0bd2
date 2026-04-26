@@ -53,7 +53,8 @@ Deno.serve(async (req) => {
 
   // 그 외 모든 액션은 관리자만 호출 가능
   try {
-    await requireAdmin(req);
+    // 통계 조회는 모든 admin role 허용.
+    await requireAdmin(req, ['super_admin', 'ops', 'cs', 'billing']);
   } catch (e) {
     if (e instanceof AuthFailure) return e.response;
     throw e;

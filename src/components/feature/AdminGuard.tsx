@@ -1,14 +1,48 @@
-import { useState, useEffect, useRef, useCallback } from 'react';
+import { useState, useEffect, useRef, useCallback, createContext, useContext } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { supabase } from '@/lib/supabase';
 import { SUPABASE_URL, SUPABASE_ANON_KEY } from '@/lib/env';
 import { logError } from '@/utils/errorHandler';
 
+/**
+ * 4-tier admin role enum, mirrors AdminRole in supabase/functions/_shared/auth.ts
+ * (migration 0007). Server enforces via requireAdmin(req, allowedRoles[]);
+ * the context here is only for UX (hide tabs the role can't use).
+ */
+export type AdminRole = 'super_admin' | 'ops' | 'cs' | 'billing';
+
+export const ADMIN_ROLE_LABELS: Record<AdminRole, string> = {
+  super_admin: '슈퍼 관리자',
+  ops:         '운영',
+  cs:          'CS',
+  billing:     '결제',
+};
+
+interface RoleCtx {
+  role: AdminRole;
+  isSuper: boolean;
+}
+
+const RoleContext = createContext<RoleCtx | null>(null);
+
+/**
+ * Throws when called outside <AdminGuard>. Components inside the guard
+ * can safely assume role is set.
+ */
+export function useAdminRole(): RoleCtx {
+  const ctx = useContext(RoleContext);
+  if (!ctx) throw new Error('useAdminRole must be used inside <AdminGuard>');
+  return ctx;
+}
+
 interface AdminGuardProps {
   children: React.ReactNode;
 }
 
-type AuthState = 'checking' | 'authorized' | 'unauthorized';
+type AuthState =
+  | { kind: 'checking' }
+  | { kind: 'authorized'; role: AdminRole }
+  | { kind: 'unauthorized' };
 const STORAGE_KEY = 'sb-session';
 const TIMEOUT_MS = 15000;
 const REVALIDATE_MS = 5 * 60 * 1000; // 5분마다 서버 재검증
@@ -64,10 +98,10 @@ function getTokenFromStorage(): string | null {
 
 export default function AdminGuard({ children }: AdminGuardProps) {
   const navigate = useNavigate();
-  const [authState, setAuthState] = useState<AuthState>('checking');
+  const [authState, setAuthState] = useState<AuthState>({ kind: 'checking' });
   const abortRef = useRef<AbortController | null>(null);
 
-  const verifyAdmin = useCallback(async (signal: AbortSignal): Promise<'authorized' | 'unauthorized'> => {
+  const verifyAdmin = useCallback(async (signal: AbortSignal): Promise<AuthState> => {
     let accessToken: string | null = null;
 
     try {
@@ -82,7 +116,7 @@ export default function AdminGuard({ children }: AdminGuardProps) {
       accessToken = getTokenFromStorage();
     }
 
-    if (!accessToken) return 'unauthorized';
+    if (!accessToken) return { kind: 'unauthorized' };
 
     try {
       const resp = await fetch(`${SUPABASE_URL}/functions/v1/admin-stats?action=check_admin`, {
@@ -94,13 +128,22 @@ export default function AdminGuard({ children }: AdminGuardProps) {
         },
         signal,
       });
-      if (!resp.ok) return 'unauthorized';
-      const result = (await resp.json()) as { is_admin?: boolean };
-      return result.is_admin === true ? 'authorized' : 'unauthorized';
+      if (!resp.ok) return { kind: 'unauthorized' };
+      const result = (await resp.json()) as { is_admin?: boolean; role?: string };
+      if (result.is_admin !== true) return { kind: 'unauthorized' };
+
+      // 마이그레이션 0007 이전의 free-text role 또는 NULL 은 super_admin 으로
+      // 폴백 (서버측 requireAdmin 도 같은 폴백을 함).
+      const rawRole = (result.role ?? '').toString();
+      const role: AdminRole =
+        rawRole === 'ops' || rawRole === 'cs' || rawRole === 'billing'
+          ? rawRole
+          : 'super_admin';
+      return { kind: 'authorized', role };
     } catch (err) {
       if (signal.aborted) throw err;
       logError(err, { where: 'AdminGuard.checkAdmin' }, 'error');
-      return 'unauthorized';
+      return { kind: 'unauthorized' };
     }
   }, []);
 
@@ -113,10 +156,8 @@ export default function AdminGuard({ children }: AdminGuardProps) {
       try {
         const next = await verifyAdmin(controller.signal);
         if (controller.signal.aborted) return;
-        if (next === 'authorized') {
-          setAuthState('authorized');
-        } else {
-          setAuthState('unauthorized');
+        setAuthState(next);
+        if (next.kind === 'unauthorized') {
           try { await supabase.auth.signOut(); } catch (err) {
             logError(err, { where: 'AdminGuard.signOut' }, 'warn');
           }
@@ -125,7 +166,7 @@ export default function AdminGuard({ children }: AdminGuardProps) {
       } catch (err) {
         if (controller.signal.aborted) return;
         logError(err, { where: 'AdminGuard.runCheck' }, 'error');
-        setAuthState('unauthorized');
+        setAuthState({ kind: 'unauthorized' });
         navigate('/admin-login', { replace: true });
       }
     };
@@ -135,7 +176,7 @@ export default function AdminGuard({ children }: AdminGuardProps) {
 
     const { data: { subscription } } = supabase.auth.onAuthStateChange((event) => {
       if (event === 'SIGNED_OUT' && !controller.signal.aborted) {
-        setAuthState('unauthorized');
+        setAuthState({ kind: 'unauthorized' });
         navigate('/admin-login', { replace: true });
       }
     });
@@ -147,7 +188,7 @@ export default function AdminGuard({ children }: AdminGuardProps) {
     };
   }, [navigate, verifyAdmin]);
 
-  if (authState === 'checking') {
+  if (authState.kind === 'checking') {
     return (
       <div className="min-h-screen bg-[#09090c] flex items-center justify-center">
         <div className="flex flex-col items-center gap-4">
@@ -163,9 +204,13 @@ export default function AdminGuard({ children }: AdminGuardProps) {
     );
   }
 
-  if (authState === 'unauthorized') {
+  if (authState.kind === 'unauthorized') {
     return null;
   }
 
-  return <>{children}</>;
+  return (
+    <RoleContext.Provider value={{ role: authState.role, isSuper: authState.role === 'super_admin' }}>
+      {children}
+    </RoleContext.Provider>
+  );
 }

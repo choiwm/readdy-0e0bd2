@@ -137,7 +137,7 @@ Deno.serve(async (req) => {
 
   let admin;
   try {
-    admin = await requireAdmin(req);
+    admin = await requireAdmin(req, ['super_admin', 'ops']);
   } catch (e) {
     if (e instanceof AuthFailure) return e.response;
     throw e;

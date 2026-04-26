@@ -268,7 +268,7 @@ Deno.serve(async (req) => {
   if (req.method !== 'POST') return json({ error: 'method_not_allowed' }, 405);
 
   try {
-    await requireAdmin(req);
+    await requireAdmin(req, ['super_admin', 'ops']);
   } catch (e) {
     if (e instanceof AuthFailure) return e.response;
     throw e;
