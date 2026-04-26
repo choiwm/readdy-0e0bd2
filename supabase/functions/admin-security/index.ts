@@ -142,10 +142,19 @@ Deno.serve(async (req) => {
     // 관리자 계정 생성
     if (req.method === 'POST' && action === 'create_admin') {
       const body = await req.json();
-      const { email, display_name, role, permissions, send_invite = true } = body;
+      const {
+        email, display_name, role, permissions,
+        invite_mode = 'manual_url',
+      } = body as {
+        email?: string; display_name?: string; role?: string;
+        permissions?: unknown[]; invite_mode?: 'manual_url' | 'auto_email' | 'none';
+      };
       if (!email || !role) return err('email and role required');
       if (!['super_admin', 'ops', 'cs', 'billing'].includes(role)) {
         return err('role must be super_admin / ops / cs / billing');
+      }
+      if (!['manual_url', 'auto_email', 'none'].includes(invite_mode)) {
+        return err('invite_mode must be manual_url / auto_email / none');
       }
 
       const { data, error } = await supabase
@@ -167,25 +176,62 @@ Deno.serve(async (req) => {
         target_type: 'security',
         target_id: data.id,
         target_label: email,
-        detail: `역할: ${role}`,
+        detail: `역할: ${role}, invite_mode: ${invite_mode}`,
       });
 
-      // Magic-link 자동 발송 (선택). 받는 사람이 가입 안 한 상태면 가입 +
-      // 자동 로그인 + /admin 으로 redirect. 이미 가입한 사용자면 ALREADY_REGISTERED
-      // 에러가 나는데 그건 정상 — 그냥 admin-login 으로 직접 로그인하면 돼요.
-      let invite_status: 'sent' | 'already_registered' | 'failed' | 'skipped' = 'skipped';
+      // invite_mode 처리. manual_url 이 기본 — Supabase 메일 인프라 의존
+      // 없이 generateLink() 만으로 1회용 URL 받아서 운영자가 Slack 등으로
+      // 직접 전달. auto_email 은 inviteUserByEmail() (Supabase 메일러
+      // 시간당 3통 한도 또는 커스텀 SMTP 설정 시 무제한). none 은 row 만.
+      const adminRedirectBase = Deno.env.get('ADMIN_INVITE_REDIRECT_URL')
+        ?? 'http://localhost:5173/admin';
+      let invite_status:
+        'sent' | 'manual_url_generated' | 'already_registered' | 'failed' | 'skipped' = 'skipped';
+      let invite_url: string | undefined;
       let invite_error: string | undefined;
-      if (send_invite) {
-        const adminRedirectBase = Deno.env.get('ADMIN_INVITE_REDIRECT_URL')
-          ?? 'http://localhost:5173/admin';
+
+      if (invite_mode === 'manual_url') {
+        try {
+          const linkRes = await supabase.auth.admin.generateLink({
+            type: 'invite',
+            email,
+            options: { redirectTo: adminRedirectBase },
+          });
+          if (linkRes.error) {
+            const msg = linkRes.error.message ?? '';
+            if (/already.*registered|already.*exist|user.*exist/i.test(msg)) {
+              // 이미 가입된 사용자면 invite 대신 magiclink 로 재로그인 URL 생성.
+              const magicRes = await supabase.auth.admin.generateLink({
+                type: 'magiclink',
+                email,
+                options: { redirectTo: adminRedirectBase },
+              });
+              if (magicRes.error) {
+                invite_status = 'failed';
+                invite_error = magicRes.error.message ?? msg;
+              } else {
+                invite_status = 'already_registered';
+                invite_url = magicRes.data?.properties?.action_link;
+              }
+            } else {
+              invite_status = 'failed';
+              invite_error = msg;
+            }
+          } else {
+            invite_status = 'manual_url_generated';
+            invite_url = linkRes.data?.properties?.action_link;
+          }
+        } catch (e) {
+          invite_status = 'failed';
+          invite_error = e instanceof Error ? e.message : String(e);
+        }
+      } else if (invite_mode === 'auto_email') {
         try {
           const inviteRes = await supabase.auth.admin.inviteUserByEmail(email, {
             redirectTo: adminRedirectBase,
           });
           if (inviteRes.error) {
             const msg = inviteRes.error.message ?? '';
-            // Supabase 의 already-registered 에러는 invite 가 needed 하지 않은
-            // 정상 케이스 — admin row 만 만들었으니 사용자가 직접 로그인하면 됨.
             if (/already.*registered|already.*exist|user.*exist/i.test(msg)) {
               invite_status = 'already_registered';
             } else {
@@ -201,7 +247,7 @@ Deno.serve(async (req) => {
         }
       }
 
-      return json({ admin: data, invite_status, invite_error }, 201);
+      return json({ admin: data, invite_status, invite_url, invite_error }, 201);
     }
 
     // 관리자 계정 수정
@@ -262,15 +308,51 @@ Deno.serve(async (req) => {
       return json({ admin: data });
     }
 
-    // Magic-link 재발송 — 처음 invite 메일을 못 받았거나 만료됐을 때.
+    // Magic-link 재발송 / URL 재생성. invite_mode 'manual_url' (기본) 이면
+    // 메일 발송 없이 URL 만 다시 받아서 응답에 포함 (운영자가 직접 전달).
+    // 'auto_email' 이면 Supabase 메일러로 발송.
     if (req.method === 'POST' && action === 'resend_invite') {
       const body = await req.json();
-      const { email } = body;
+      const { email, invite_mode = 'manual_url' } = body as {
+        email?: string; invite_mode?: 'manual_url' | 'auto_email';
+      };
       if (!email) return err('email required');
+      if (!['manual_url', 'auto_email'].includes(invite_mode)) {
+        return err('invite_mode must be manual_url or auto_email');
+      }
 
       const adminRedirectBase = Deno.env.get('ADMIN_INVITE_REDIRECT_URL')
         ?? 'http://localhost:5173/admin';
+
       try {
+        if (invite_mode === 'manual_url') {
+          // 가입 여부 모를 때는 일단 invite 시도 후, already_registered 면
+          // magiclink 로 fallback. 두 케이스 모두 사용 가능한 URL 반환.
+          let res = await supabase.auth.admin.generateLink({
+            type: 'invite',
+            email,
+            options: { redirectTo: adminRedirectBase },
+          });
+          let status: 'manual_url_generated' | 'already_registered' = 'manual_url_generated';
+          if (res.error && /already.*registered|already.*exist|user.*exist/i.test(res.error.message ?? '')) {
+            res = await supabase.auth.admin.generateLink({
+              type: 'magiclink',
+              email,
+              options: { redirectTo: adminRedirectBase },
+            });
+            status = 'already_registered';
+          }
+          if (res.error) return err(res.error.message ?? 'generate link failed');
+
+          await writeAuditLog(supabase, admin, '관리자 invite 재발송', {
+            target_type: 'security',
+            target_label: email,
+            detail: `mode: manual_url, status: ${status}`,
+          });
+          return json({ ok: true, status, invite_url: res.data?.properties?.action_link });
+        }
+
+        // auto_email
         const inviteRes = await supabase.auth.admin.inviteUserByEmail(email, {
           redirectTo: adminRedirectBase,
         });
@@ -285,6 +367,7 @@ Deno.serve(async (req) => {
         await writeAuditLog(supabase, admin, '관리자 invite 재발송', {
           target_type: 'security',
           target_label: email,
+          detail: 'mode: auto_email',
         });
         return json({ ok: true, status: 'sent' });
       } catch (e) {
