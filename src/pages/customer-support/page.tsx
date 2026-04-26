@@ -165,6 +165,9 @@ export default function CustomerSupportPage() {
             subject: formData.type || '일반 문의',
             message: formData.message,
           }),
+          // 누락 시 Edge Function 응답이 늦으면 사용자가 무한 spinner 보고
+          // 새로고침 → 중복 제출 가능성. 15초 cap.
+          signal: AbortSignal.timeout(15_000),
         },
       );
       if (res.ok) {
