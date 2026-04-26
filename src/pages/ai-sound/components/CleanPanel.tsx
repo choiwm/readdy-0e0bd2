@@ -382,16 +382,35 @@ export default function CleanPanel({ onDeductCredits, credits = 999, onRefundCre
 
   const handleDragOver = (e: React.DragEvent) => { e.preventDefault(); setIsDragging(true); };
   const handleDragLeave = () => setIsDragging(false);
+  // LALAL.AI 업로드 한도 (라이선스마다 다르지만 100MB 이상은 거의 거절).
+  // type/size 검증 누락 시 사용자가 0.5GB 영상 드롭하고 진행 안 되는 이유를
+  // 모르거나, 비디오/오디오가 아닌 파일(예: 이미지) 드롭 시 LALAL.AI 가
+  // 502 로 응답해서 로딩만 무한 도는 케이스 발생.
+  const MAX_AUDIO_BYTES = 100 * 1024 * 1024;
+  const acceptUploadedFile = (file: File): boolean => {
+    if (!file.type.startsWith('audio/') && !file.type.startsWith('video/')) {
+      setErrorMsg('오디오 또는 영상 파일만 올릴 수 있어요.');
+      setStatus('error');
+      return false;
+    }
+    if (file.size > MAX_AUDIO_BYTES) {
+      setErrorMsg(`파일이 너무 커요 (${(file.size / 1024 / 1024).toFixed(1)}MB). 100MB 이하로 줄여주세요.`);
+      setStatus('error');
+      return false;
+    }
+    return true;
+  };
+
   const handleDrop = (e: React.DragEvent) => {
     e.preventDefault();
     setIsDragging(false);
     const file = e.dataTransfer.files[0];
-    if (file) { setUploadedFile(file); setStatus('idle'); setProgress(0); setErrorMsg(''); }
+    if (file && acceptUploadedFile(file)) { setUploadedFile(file); setStatus('idle'); setProgress(0); setErrorMsg(''); }
   };
 
   const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
     const f = e.target.files?.[0];
-    if (f) { setUploadedFile(f); setStatus('idle'); setProgress(0); setErrorMsg(''); }
+    if (f && acceptUploadedFile(f)) { setUploadedFile(f); setStatus('idle'); setProgress(0); setErrorMsg(''); }
   };
 
   const startFakeProgress = useCallback((startVal: number, endVal: number, durationMs: number) => {
