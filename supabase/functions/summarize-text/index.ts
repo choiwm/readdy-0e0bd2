@@ -75,6 +75,7 @@ Rules:
         max_tokens: 400,
         temperature: 0.5,
       }),
+      signal: AbortSignal.timeout(30_000),
     });
 
     if (!res.ok) {
