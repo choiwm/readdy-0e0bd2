@@ -41,9 +41,26 @@ export default function AdSidebar({
   const productInputRef = useRef<HTMLInputElement>(null);
   const { credits } = useCredits();
 
+  // 사용자가 50MB 이미지나 PDF 드래그해도 그대로 blob URL 만들어버려 나중에
+  // fal.ai 가 image_too_large / file_download_error 로 422. browser-level
+  // accept= 는 hint 일 뿐이니 명시적으로 검증.
+  // 8MB 는 utils/uploadProductImage 의 MAX_FILE_SIZE 와 일치.
+  const MAX_IMAGE_BYTES = 8 * 1024 * 1024;
+
+  function validateImageFile(file: File): string | null {
+    if (!file.type.startsWith('image/')) return '이미지 파일만 올릴 수 있어요.';
+    if (file.size > MAX_IMAGE_BYTES) {
+      const mb = (file.size / 1024 / 1024).toFixed(1);
+      return `이미지가 너무 커요 (${mb}MB). 8MB 이하로 줄여주세요.`;
+    }
+    return null;
+  }
+
   const handleThumbChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
+    const err = validateImageFile(file);
+    if (err) { alert(err); e.target.value = ''; return; }
     const url = URL.createObjectURL(file);
     onThumbUpload(url);
     e.target.value = '';
@@ -52,6 +69,8 @@ export default function AdSidebar({
   const handleProductChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file || sidebarProducts.length >= 3) return;
+    const err = validateImageFile(file);
+    if (err) { alert(err); e.target.value = ''; return; }
     const url = URL.createObjectURL(file);
     setSidebarProducts((prev) => [...prev, url]);
     e.target.value = '';
