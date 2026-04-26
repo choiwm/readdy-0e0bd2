@@ -655,8 +655,11 @@ export default function GalleryGrid({ onSelectItem, generatedItems = [], onItemA
     const ext = item.type === 'video' ? 'mp4' : 'png';
     const filename = `gallery_${item.id}_${item.model.replace(/\s/g, '_')}.${ext}`;
     try {
-      const response = await fetch(item.url);
+      // 만료된 URL 의 0 바이트 blob 강제 다운로드 방지 + 20s timeout.
+      const response = await fetch(item.url, { signal: AbortSignal.timeout(20_000) });
+      if (!response.ok) throw new Error(`HTTP ${response.status}`);
       const blob = await response.blob();
+      if (blob.size === 0) throw new Error('empty');
       const objectUrl = URL.createObjectURL(blob);
       const link = document.createElement('a');
       link.href = objectUrl;
@@ -798,8 +801,10 @@ export default function GalleryGrid({ onSelectItem, generatedItems = [], onItemA
                   setTimeout(async () => {
                     const ext = item.type === 'video' ? 'mp4' : 'png';
                     try {
-                      const response = await fetch(item.url);
+                      const response = await fetch(item.url, { signal: AbortSignal.timeout(20_000) });
+                      if (!response.ok) throw new Error(`HTTP ${response.status}`);
                       const blob = await response.blob();
+                      if (blob.size === 0) throw new Error('empty');
                       const objectUrl = URL.createObjectURL(blob);
                       const link = document.createElement('a');
                       link.href = objectUrl;
