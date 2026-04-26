@@ -215,7 +215,16 @@ function RefImagePopup({
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const handleFile = useCallback((file: File) => {
-    if (!file.type.startsWith('image/')) return;
+    if (!file.type.startsWith('image/')) {
+      alert('이미지 파일만 올릴 수 있어요.');
+      return;
+    }
+    // 8MB 제한 — fal.ai i2i 가 image_too_large 로 거절하는 경계와 일치
+    // (utils/uploadProductImage 의 MAX_FILE_SIZE 와 동일).
+    if (file.size > 8 * 1024 * 1024) {
+      alert(`이미지가 너무 커요 (${(file.size / 1024 / 1024).toFixed(1)}MB). 8MB 이하로 줄여주세요.`);
+      return;
+    }
     const url = URL.createObjectURL(file);
     setPreview({ url, name: file.name });
   }, []);
