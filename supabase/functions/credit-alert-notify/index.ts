@@ -44,8 +44,15 @@ Deno.serve(async (req) => {
         .eq('user_id', user_id)
         .maybeSingle();
 
-      if (!settings || !settings.email_enabled) {
-        return json({ sent: false, reason: 'notification_disabled_or_no_settings' });
+      if (!settings) {
+        return json({ sent: false, reason: 'no_settings' });
+      }
+      // 이전엔 email_enabled 가 false 이면 bell notification 까지 막아버려서
+      // 사용자가 이메일만 끄고 인앱 알림은 받고 싶어도 둘 다 차단됐어요.
+      // email_enabled 는 이름 그대로 이메일 채널만 컨트롤하고, 인앱 bell 은
+      // 임계값 가드만 통과하면 무조건 발송.
+      if (!settings.alert_on_pct && !settings.alert_on_amount) {
+        return json({ sent: false, reason: 'all_alert_types_disabled' });
       }
 
       if (settings.last_alerted_at) {
