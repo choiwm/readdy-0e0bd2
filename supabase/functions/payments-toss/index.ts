@@ -190,6 +190,10 @@ async function handleConfirm(req: Request, user: AuthedUser): Promise<Response> 
   // 3) Call Toss confirm API — Toss is the final source of truth.
   let tossData: any;
   try {
+    // Toss confirm 은 결제 흐름의 마지막 진실의 원천이라 hang 하면 사용자가
+    // 무한 로딩 후 새로고침 → 같은 paymentKey 로 재시도 → idempotency 처리는
+    // toss 가 알아서 한다 해도 UX 가 깨져요. 25 초 타임아웃 (Toss SLA 평균
+    // < 5s, p99 < 15s).
     const res = await fetch('https://api.tosspayments.com/v1/payments/confirm', {
       method: 'POST',
       headers: {
@@ -197,6 +201,7 @@ async function handleConfirm(req: Request, user: AuthedUser): Promise<Response> 
         'Content-Type': 'application/json',
       },
       body: JSON.stringify({ paymentKey, orderId, amount }),
+      signal: AbortSignal.timeout(25_000),
     });
     tossData = await res.json();
     if (!res.ok) {
