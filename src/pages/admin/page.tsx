@@ -25,6 +25,7 @@ import SysSettingsTab from './components/SysSettingsTab';
 import BillingTab from './components/BillingTab';
 import AuditTab from './components/AuditTab';
 import SecurityTab from './components/SecurityTab';
+import AdminRosterPanel from './components/AdminRosterPanel';
 import UsersTab from './components/UsersTab';
 import ContentTab from './components/ContentTab';
 import OverviewTab from './components/OverviewTab';
@@ -50,7 +51,7 @@ import {
 } from './hooks/useAdminActions';
 
 // ── Types ──────────────────────────────────────────────────────────────────
-type TabType = 'overview' | 'users' | 'coin-grant' | 'content' | 'ai-engine' | 'billing' | 'cs' | 'cs-notice' | 'audit' | 'sys-settings' | 'security' | 'grade-settings';
+type TabType = 'overview' | 'users' | 'coin-grant' | 'content' | 'ai-engine' | 'billing' | 'cs' | 'cs-notice' | 'audit' | 'sys-settings' | 'security' | 'grade-settings' | 'admin-roster';
 
 // Server-side requireAdmin in each Edge Function is the security boundary
 // (migration 0007 + auth.ts allowedRoles). The map below is purely UX —
@@ -60,7 +61,7 @@ const VISIBLE_TABS_BY_ROLE: Record<AdminRole, ReadonlySet<TabType>> = {
   super_admin: new Set<TabType>([
     'overview', 'users', 'coin-grant', 'grade-settings',
     'content', 'ai-engine', 'billing', 'cs', 'cs-notice',
-    'audit', 'sys-settings', 'security',
+    'audit', 'sys-settings', 'security', 'admin-roster',
   ]),
   ops: new Set<TabType>([
     'overview', 'users', 'content', 'ai-engine', 'cs-notice', 'audit', 'sys-settings',
@@ -654,6 +655,7 @@ export default function AdminPage() {
     { id: 'audit' as TabType, icon: 'ri-file-chart-line', label: '감사 로그' },
     { id: 'sys-settings' as TabType, icon: 'ri-settings-3-line', label: '시스템 설정' },
     { id: 'security' as TabType, icon: 'ri-shield-keyhole-line', label: '보안 / 2FA' },
+    { id: 'admin-roster' as TabType, icon: 'ri-shield-user-line', label: 'Admin 관리' },
   ];
 
   // DB에서 직접 필터링하므로 displayAuditLogs 그대로 사용
@@ -1075,6 +1077,16 @@ export default function AdminPage() {
                 setIpBlockReason={setIpBlockReason}
                 onIpBlock={handleIpBlock}
                 onIpUnblock={handleIpUnblock}
+              />
+            )}
+
+            {/* ══════════════════════════════════════════════════════════════
+                ⑩ ADMIN ROSTER (Super Admin only — gated by VISIBLE_TABS_BY_ROLE)
+            ══════════════════════════════════════════════════════════════ */}
+            {activeTab === 'admin-roster' && (
+              <AdminRosterPanel
+                isDark={isDark}
+                onToast={(msg, type) => addToast(msg, type)}
               />
             )}
 
