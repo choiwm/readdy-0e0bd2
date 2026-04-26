@@ -174,6 +174,8 @@ serve(async (req) => {
         "Authorization": `license ${LALAL_KEY}`,
       },
       body: uploadForm,
+      // LALAL.AI 가 hang 하면 Edge Function 의 2분 wall 까지 대기 — timeout 명시.
+      signal: AbortSignal.timeout(60_000),
     });
 
     if (!uploadRes.ok) {
@@ -219,6 +221,7 @@ serve(async (req) => {
               mdx_steps: 1,
               splitter: "phoenix",
             }),
+            signal: AbortSignal.timeout(30_000),
           });
 
           if (!splitRes.ok) {
@@ -271,6 +274,7 @@ serve(async (req) => {
           "Content-Type": "application/json",
         },
         body: JSON.stringify(splitBody),
+        signal: AbortSignal.timeout(30_000),
       });
 
       if (!splitRes.ok) {
@@ -342,6 +346,7 @@ async function pollForResult(
         headers: {
           "Authorization": `license ${apiKey}`,
         },
+        signal: AbortSignal.timeout(15_000),
       });
 
       if (!checkRes.ok) {

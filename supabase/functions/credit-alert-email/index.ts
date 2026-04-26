@@ -239,6 +239,7 @@ Deno.serve(async (req) => {
           subject: `⚡ 크레딧이 부족합니다 — 현재 ${current_balance.toLocaleString()} CR`,
           html: emailHtml,
         }),
+        signal: AbortSignal.timeout(15_000),
       });
 
       const emailResult = await emailRes.json();
@@ -368,6 +369,7 @@ Deno.serve(async (req) => {
           subject: `[테스트] ⚡ 크레딧 부족 알림 테스트`,
           html: emailHtml,
         }),
+        signal: AbortSignal.timeout(15_000),
       });
 
       const result = await emailRes.json();
