@@ -14,7 +14,8 @@ Deno.serve(async (req) => {
   const err = (msg: string, status = 400) => json({ error: msg }, status);
   let admin: AuthedAdmin;
   try {
-    admin = await requireAdmin(req);
+    // 결제 조회는 ops 도 OK; 환불은 핸들러 내부에서 super_admin/billing 만 가능.
+    admin = await requireAdmin(req, ['super_admin', 'ops', 'billing']);
   } catch (e) {
     if (e instanceof AuthFailure) return e.response;
     throw e;
@@ -80,6 +81,11 @@ Deno.serve(async (req) => {
 
     // 환불 처리 - updated_at 컬럼 없으므로 제거
     if (req.method === 'POST' && action === 'refund_payment') {
+      // 환불은 ops 가 아닌 super_admin / billing 만. 진입 시 ops 도 통과
+      // 시켰지만 destructive 인 환불은 한 단계 더 엄격하게.
+      if (admin.role !== 'super_admin' && admin.role !== 'billing') {
+        return err('forbidden_role: refund requires super_admin or billing', 403);
+      }
       const body = await req.json();
       const { id, refund_reason } = body;
       if (!id) return err('id required');

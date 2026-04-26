@@ -14,7 +14,7 @@ Deno.serve(async (req) => {
   const err = (msg: string, status = 400) => json({ error: msg }, status);
 
   try {
-    await requireAdmin(req);
+    await requireAdmin(req, ['super_admin', 'ops']);
   } catch (e) {
     if (e instanceof AuthFailure) return e.response;
     throw e;
