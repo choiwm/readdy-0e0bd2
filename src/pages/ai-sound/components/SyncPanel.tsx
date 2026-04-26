@@ -197,11 +197,29 @@ export default function SyncPanel({ onDeductCredits, credits = 999, onRefundCred
 
   const handleDragOver = (e: React.DragEvent) => { e.preventDefault(); setIsDragging(true); };
   const handleDragLeave = () => setIsDragging(false);
+  // 100MB 제한 — analyze-video-sfx 가 GPT 비전으로 프레임 추출 후 분석하는데
+  // 큰 파일은 timeout 또는 OOM. 사용자가 크기 모르고 드롭하면 영문도 모르고
+  // 실패. 일관된 한국어 메시지로 거절.
+  const MAX_VIDEO_BYTES = 100 * 1024 * 1024;
+  const acceptVideoFile = (file: File): boolean => {
+    if (!file.type.startsWith('video/')) {
+      setErrorMsg('영상 파일만 올릴 수 있어요.');
+      setStep('error');
+      return false;
+    }
+    if (file.size > MAX_VIDEO_BYTES) {
+      setErrorMsg(`영상이 너무 커요 (${(file.size / 1024 / 1024).toFixed(1)}MB). 100MB 이하로 줄여주세요.`);
+      setStep('error');
+      return false;
+    }
+    return true;
+  };
+
   const handleDrop = (e: React.DragEvent) => {
     e.preventDefault();
     setIsDragging(false);
     const file = e.dataTransfer.files[0];
-    if (file && file.type.startsWith('video/')) {
+    if (file && acceptVideoFile(file)) {
       setUploadedFile(file);
       setStep('idle');
       setProgress(0);
@@ -211,7 +229,7 @@ export default function SyncPanel({ onDeductCredits, credits = 999, onRefundCred
 
   const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
     const f = e.target.files?.[0];
-    if (f) {
+    if (f && acceptVideoFile(f)) {
       setUploadedFile(f);
       setStep('idle');
       setProgress(0);
