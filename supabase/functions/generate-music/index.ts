@@ -206,6 +206,7 @@ async function sendGenerationNotification(opts: {
           user_id: opts.userId, generation_type: opts.generationType,
           model_name: opts.modelName, credits_used: opts.creditsUsed, action_url: opts.actionUrl,
         }),
+        signal: AbortSignal.timeout(10_000),
       }
     );
   } catch { /* 알림 실패는 무시 */ }

@@ -1,10 +1,19 @@
 import { useEffect } from 'react';
 import { Link, useSearchParams } from 'react-router-dom';
 
+// Toss 가 실패 콜백에 query string 으로 message 를 보내는데, 이론적으로는
+// 누군가 임의 길이의 phishing 메시지를 URL 에 넣어 사용자에게 공유할 수 있어요
+// (예: 결제 안내 사칭). React 가 자동 escape 해서 XSS 는 막지만 사회공학적
+// 메시지를 그대로 보여주지 않도록 길이 cap.
+const MAX_MESSAGE_LEN = 200;
+
 export default function PaymentFailPage() {
   const [params] = useSearchParams();
   const code = params.get('code') ?? '';
-  const message = params.get('message') ?? '결제가 정상적으로 완료되지 않았습니다.';
+  const rawMessage = params.get('message') ?? '결제가 정상적으로 완료되지 않았습니다.';
+  const message = rawMessage.length > MAX_MESSAGE_LEN
+    ? `${rawMessage.slice(0, MAX_MESSAGE_LEN)}...`
+    : rawMessage;
   const orderId = params.get('orderId') ?? '';
 
   useEffect(() => {
