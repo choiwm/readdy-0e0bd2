@@ -3,6 +3,7 @@ import type { AppliedAngle } from '@/utils/characterPrompt';
 import { ANGLE_PRESETS } from '@/pages/ai-create/data/presets';
 import RangeSlider from './RangeSlider';
 import GenerationProgress from './GenerationProgress';
+import { pollImageResult } from '@/pages/ai-ad/utils/falPolling';
 import type { ProgressStep } from './GenerationProgress';
 import type { GalleryItem } from '@/mocks/galleryItems';
 import { supabase } from '@/lib/supabase';
@@ -342,7 +343,21 @@ export default function AngleView({ onApplyAngle, appliedAngle, sharedDraft, onD
       setGenStep('rendering');
       await new Promise((r) => setTimeout(r, 400));
 
-      if (error || !data?.imageUrl) {
+      // pending 응답을 폴링해 큐 케이스도 처리 (PR #40 의 Step4Image 패턴).
+      // 이전엔 imageUrl 없으면 즉시 실패 처리해서 비-schnell 모델은 거의 실패.
+      let finalImageUrl: string | null = null;
+      if (data?.imageUrl) {
+        finalImageUrl = data.imageUrl as string;
+      } else if (data?.pending && data?.request_id) {
+        finalImageUrl = await pollImageResult(
+          data.model as string,
+          data.request_id as string,
+          data.status_url as string | undefined,
+          data.response_url as string | undefined,
+          data.save_opts as Record<string, unknown> | undefined,
+        );
+      }
+      if (error || !finalImageUrl) {
         throw new Error(data?.error ?? error?.message ?? '이미지 생성에 실패했습니다.');
       }
 
@@ -354,7 +369,7 @@ export default function AngleView({ onApplyAngle, appliedAngle, sharedDraft, onD
         tilt: Math.round(tilt),
         zoom: Math.round(zoom),
         presetLabel,
-        img: data.imageUrl,
+        img: finalImageUrl,
         sourceImg: sourceImage,
         generatedAt: new Date().toISOString(),
       };
