@@ -38,9 +38,16 @@ export default function AdminRosterPanel({ isDark, currentAdminId, onToast }: Pr
   const [inviteEmail, setInviteEmail] = useState('');
   const [inviteName, setInviteName] = useState('');
   const [inviteRole, setInviteRole] = useState<AdminRole>('cs');
-  const [sendInvite, setSendInvite] = useState(true);
+  // 'manual_url' (기본): generateLink 로 1회용 URL 받아서 운영자가 직접 전달.
+  //                      Resend / Supabase 메일러 등 인프라 의존 없음.
+  // 'auto_email': inviteUserByEmail 로 Supabase 메일러 발송 (시간당 3통 한도).
+  // 'none': admin row 만 만들고 끝. 받는 사람이 직접 회원가입 후 매칭.
+  const [inviteMode, setInviteMode] = useState<'manual_url' | 'auto_email' | 'none'>('manual_url');
   const [inviteError, setInviteError] = useState<string | null>(null);
   const [inviting, setInviting] = useState(false);
+  // URL 발급 결과를 별도 모달로 표시 — 운영자가 복사해서 Slack 등으로 전달.
+  const [issuedUrl, setIssuedUrl] = useState<{ email: string; url: string; status: string } | null>(null);
+  const [copyOk, setCopyOk] = useState(false);
 
   const cardBg = isDark ? 'bg-zinc-900/60' : 'bg-white';
   const subBg = isDark ? 'bg-zinc-800/60' : 'bg-slate-50';
@@ -88,7 +95,7 @@ export default function AdminRosterPanel({ isDark, currentAdminId, onToast }: Pr
           email: inviteEmail.trim(),
           display_name: inviteName.trim() || undefined,
           role: inviteRole,
-          send_invite: sendInvite,
+          invite_mode: inviteMode,
         }),
       });
       const data = await res.json();
@@ -96,47 +103,67 @@ export default function AdminRosterPanel({ isDark, currentAdminId, onToast }: Pr
         setInviteError(data?.error ?? `HTTP ${res.status}`);
         return;
       }
-      // 백엔드가 invite 결과를 함께 알려줘서 사용자에게 정확한 안내.
-      let toastMsg = `${inviteEmail} 추가 완료 (${ADMIN_ROLE_LABELS[inviteRole]})`;
-      if (data.invite_status === 'sent') {
-        toastMsg += ' — Magic-link 메일 발송됨';
+      // 결과 분기: manual_url / already_registered (URL 받음) → 별도 모달
+      // 로 띄워서 운영자가 복사 가능. 그 외엔 토스트만.
+      const targetEmail = inviteEmail.trim();
+      if ((data.invite_status === 'manual_url_generated' || data.invite_status === 'already_registered') && data.invite_url) {
+        setIssuedUrl({ email: targetEmail, url: data.invite_url, status: data.invite_status });
+        onToast(`${targetEmail} 추가 완료 — invite URL 생성됨`, 'success');
+      } else if (data.invite_status === 'sent') {
+        onToast(`${targetEmail} 추가 완료 — Supabase 메일 발송됨`, 'success');
       } else if (data.invite_status === 'already_registered') {
-        toastMsg += ' — 이미 가입된 사용자라 invite 미발송';
+        onToast(`${targetEmail} 추가 완료 — 이미 가입된 사용자, 직접 로그인 가능`, 'info');
       } else if (data.invite_status === 'failed') {
-        toastMsg += ` — 메일 발송 실패: ${data.invite_error ?? '알 수 없음'}`;
+        onToast(`${targetEmail} 추가 완료, 다만 invite 발급 실패: ${data.invite_error ?? '알 수 없음'}`, 'warning');
+      } else {
+        onToast(`${targetEmail} 추가 완료 (${ADMIN_ROLE_LABELS[inviteRole]})`, 'success');
       }
-      onToast(toastMsg, data.invite_status === 'failed' ? 'warning' : 'success');
       setInviteOpen(false);
       setInviteEmail('');
       setInviteName('');
       setInviteRole('cs');
-      setSendInvite(true);
+      setInviteMode('manual_url');
       await fetchAdmins();
     } finally {
       setInviting(false);
     }
   };
 
+  // 재발송도 기본은 manual_url — 운영자가 복사해서 직접 전달.
   const handleResendInvite = async (target: AdminRow) => {
     setBusyId(target.id);
     try {
       const res = await fetch(`${SECURITY_FN}?action=resend_invite`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', Authorization: getAuthorizationHeader() },
-        body: JSON.stringify({ email: target.email }),
+        body: JSON.stringify({ email: target.email, invite_mode: 'manual_url' }),
       });
       const data = await res.json();
       if (!res.ok) {
         onToast(data?.error ?? `HTTP ${res.status}`, 'error');
         return;
       }
-      if (data.status === 'already_registered') {
+      if (data.invite_url) {
+        setIssuedUrl({ email: target.email, url: data.invite_url, status: data.status ?? 'manual_url_generated' });
+        onToast(`${target.email} invite URL 재생성됨`, 'success');
+      } else if (data.status === 'already_registered') {
         onToast(data.hint ?? '이미 가입된 사용자에요.', 'info');
       } else {
-        onToast(`${target.email} 에게 magic-link 재발송됨`, 'success');
+        onToast(`${target.email} invite 재처리 완료`, 'success');
       }
     } finally {
       setBusyId(null);
+    }
+  };
+
+  const copyUrlToClipboard = async () => {
+    if (!issuedUrl) return;
+    try {
+      await navigator.clipboard.writeText(issuedUrl.url);
+      setCopyOk(true);
+      setTimeout(() => setCopyOk(false), 2000);
+    } catch {
+      onToast('클립보드 접근 불가 — URL 을 직접 선택해서 복사해주세요', 'error');
     }
   };
 
@@ -360,19 +387,30 @@ export default function AdminRosterPanel({ isDark, currentAdminId, onToast }: Pr
               </select>
               <p className={`text-[10px] ${faintText} leading-relaxed`}>{ROLE_DESCRIPTIONS[inviteRole]}</p>
             </div>
-            <label className="flex items-start gap-2 cursor-pointer">
-              <input
-                type="checkbox"
-                checked={sendInvite}
-                onChange={(e) => setSendInvite(e.target.checked)}
-                className="mt-0.5 cursor-pointer"
-              />
-              <span className={`text-[11px] ${subText} leading-relaxed`}>
-                Magic-link 메일 자동 발송 — 받는 사람이 클릭하면 가입 후 자동으로 admin 패널 진입.
-                <br />
-                <span className={`text-[10px] ${faintText}`}>이미 가입한 사용자라면 안 보내도 됨 (직접 admin-login 가능).</span>
-              </span>
-            </label>
+            <div className="space-y-2">
+              <label className={`text-[11px] font-bold ${faintText}`}>초대 방식</label>
+              <div className="space-y-1.5">
+                {([
+                  { id: 'manual_url', label: 'URL 직접 전달 (권장)', desc: '1회용 URL 만 받아서 Slack/카톡 등으로 전달. 외부 메일 서비스 불필요.' },
+                  { id: 'auto_email', label: 'Supabase 메일 자동 발송', desc: '시간당 3통 제한 (커스텀 SMTP 미설정 시). 받는 사람이 메일 클릭.' },
+                  { id: 'none',       label: '계정만 생성 (초대 안 보냄)', desc: '받는 사람이 직접 회원가입하면 자동 매칭. URL 도 메일도 없음.' },
+                ] as const).map((opt) => (
+                  <label key={opt.id} className={`flex items-start gap-2 p-2 rounded-lg cursor-pointer border ${inviteMode === opt.id ? 'border-indigo-500/40 bg-indigo-500/5' : `border-transparent ${subBg}`}`}>
+                    <input
+                      type="radio"
+                      name="invite_mode"
+                      checked={inviteMode === opt.id}
+                      onChange={() => setInviteMode(opt.id)}
+                      className="mt-0.5 cursor-pointer"
+                    />
+                    <span className="flex-1 min-w-0">
+                      <span className={`text-[12px] font-bold ${text}`}>{opt.label}</span>
+                      <span className={`block text-[10px] ${faintText} leading-relaxed mt-0.5`}>{opt.desc}</span>
+                    </span>
+                  </label>
+                ))}
+              </div>
+            </div>
             {inviteError && (
               <div className="rounded-lg bg-red-500/10 border border-red-500/30 px-3 py-2 text-xs text-red-300">{inviteError}</div>
             )}
@@ -392,6 +430,52 @@ export default function AdminRosterPanel({ isDark, currentAdminId, onToast }: Pr
                 {inviting ? '추가 중...' : '추가'}
               </button>
             </div>
+          </div>
+        </div>
+      )}
+
+      {/* Manual-URL 발급 결과 모달 — 운영자가 복사해서 Slack/카톡 등으로 직접 전달.
+          닫으면 URL 은 다시 못 봐요 (Supabase 가 1회용으로 만든거라 재요청해야 함).
+          그래서 닫기 전에 한 번 더 경고. */}
+      {issuedUrl && (
+        <div className="fixed inset-0 z-50 bg-black/60 flex items-center justify-center p-4" onClick={() => setIssuedUrl(null)}>
+          <div className={`${cardBg} border ${border} rounded-2xl p-6 max-w-lg w-full space-y-4`} onClick={(e) => e.stopPropagation()}>
+            <div className="flex items-start gap-3">
+              <div className="w-10 h-10 rounded-xl bg-indigo-500/15 border border-indigo-500/30 flex items-center justify-center flex-shrink-0">
+                <i className="ri-link text-indigo-400 text-lg" />
+              </div>
+              <div className="flex-1 min-w-0">
+                <h3 className={`text-base font-bold ${text}`}>Invite URL 생성 완료</h3>
+                <p className={`text-[11px] ${subText} mt-1 leading-relaxed`}>
+                  <span className="font-mono">{issuedUrl.email}</span> 에게 아래 URL 을 전달해주세요.
+                  {issuedUrl.status === 'already_registered' && (
+                    <> 이미 가입된 사용자라 invite 대신 magic-link 로 발급됐어요 (1회용 자동 로그인).</>
+                  )}
+                </p>
+              </div>
+            </div>
+            <div className={`${subBg} border ${border} rounded-xl p-3 break-all font-mono text-[11px] ${text} max-h-40 overflow-y-auto`}>
+              {issuedUrl.url}
+            </div>
+            <div className="flex gap-2">
+              <button
+                onClick={copyUrlToClipboard}
+                className={`flex-1 px-3 py-2 rounded-lg text-sm font-bold transition-all ${
+                  copyOk ? 'bg-emerald-500 text-white' : 'bg-indigo-500 hover:bg-indigo-400 text-white'
+                }`}
+              >
+                {copyOk ? '✓ 복사됨' : 'URL 복사'}
+              </button>
+              <button
+                onClick={() => setIssuedUrl(null)}
+                className={`flex-1 px-3 py-2 rounded-lg text-sm font-bold ${subBg} border ${border} ${subText} hover:opacity-80`}
+              >
+                닫기
+              </button>
+            </div>
+            <p className={`text-[10px] ${faintText} leading-relaxed`}>
+              ⚠️ 이 URL 은 1회용이에요. 닫으면 다시 못 봐요. 필요하면 admin 행의 "invite 재발송" 버튼으로 새 URL 을 받을 수 있어요.
+            </p>
           </div>
         </div>
       )}
