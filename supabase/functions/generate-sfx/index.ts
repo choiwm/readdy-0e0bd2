@@ -201,7 +201,7 @@ async function logUsage(supabase: ReturnType<typeof createClient>, opts: {
 
 async function sendGenerationNotification(opts: { userId: string; generationType: string; modelName: string; creditsUsed: number; actionUrl: string; supabaseUrl: string; anonKey: string; }) {
   try {
-    await fetch(`${opts.supabaseUrl}/functions/v1/credit-alert-notify?action=generation_complete`, { method: 'POST', headers: { 'Authorization': `Bearer ${opts.anonKey}`, 'Content-Type': 'application/json' }, body: JSON.stringify({ user_id: opts.userId, generation_type: opts.generationType, model_name: opts.modelName, credits_used: opts.creditsUsed, action_url: opts.actionUrl }) });
+    await fetch(`${opts.supabaseUrl}/functions/v1/credit-alert-notify?action=generation_complete`, { method: 'POST', headers: { 'Authorization': `Bearer ${opts.anonKey}`, 'Content-Type': 'application/json' }, body: JSON.stringify({ user_id: opts.userId, generation_type: opts.generationType, model_name: opts.modelName, credits_used: opts.creditsUsed, action_url: opts.actionUrl }), signal: AbortSignal.timeout(10_000) });
   } catch { /* 무시 */ }
 }
 
