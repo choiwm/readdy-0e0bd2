@@ -3,6 +3,7 @@ import type { AppliedLook } from '@/utils/characterPrompt';
 import RangeSlider from './RangeSlider';
 import GenerationProgress from './GenerationProgress';
 import type { ProgressStep } from './GenerationProgress';
+import { pollImageResult } from '@/pages/ai-ad/utils/falPolling';
 import type { GalleryItem } from '@/mocks/galleryItems';
 import PageHeader from '@/components/feature/PageHeader';
 import { supabase } from '@/lib/supabase';
@@ -243,7 +244,20 @@ export default function LookView({ onApplyLook, appliedLook, onSaveToGallery }: 
       setGenStep('refining');
       await new Promise((r) => setTimeout(r, 400));
 
-      if (error || !data?.imageUrl) {
+      // pending 응답 폴링 (PR #40 / Cycle 28 패턴)
+      let finalImageUrl: string | null = null;
+      if (data?.imageUrl) {
+        finalImageUrl = data.imageUrl as string;
+      } else if (data?.pending && data?.request_id) {
+        finalImageUrl = await pollImageResult(
+          data.model as string,
+          data.request_id as string,
+          data.status_url as string | undefined,
+          data.response_url as string | undefined,
+          data.save_opts as Record<string, unknown> | undefined,
+        );
+      }
+      if (error || !finalImageUrl) {
         throw new Error(data?.error ?? error?.message ?? '이미지 생성에 실패했습니다.');
       }
 
@@ -253,7 +267,7 @@ export default function LookView({ onApplyLook, appliedLook, onSaveToGallery }: 
         id: `lres_${Date.now()}`,
         lookId: selectedLook.id,
         lookLabel: selectedLook.label,
-        img: data.imageUrl,
+        img: finalImageUrl,
         generatedAt: new Date().toISOString(),
       };
       setResults((prev) => [newResult, ...prev]);

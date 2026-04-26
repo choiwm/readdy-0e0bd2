@@ -3,6 +3,7 @@ import PageHeader from '@/components/feature/PageHeader';
 import type { AppliedCharacter } from '../page';
 import { supabase } from '@/lib/supabase';
 import { useCredits } from '@/hooks/useCredits';
+import { pollImageResult } from '@/pages/ai-ad/utils/falPolling';
 import { useAuth } from '@/hooks/useAuth';
 
 interface CustomCharacterModalProps {
@@ -245,11 +246,24 @@ export default function CustomCharacterModal({ onClose, onGenerate }: CustomChar
         },
       });
 
-      if (error || !data?.imageUrl) {
+      // pending 응답 폴링 (PR #40 / Cycle 28 패턴)
+      let finalImageUrl: string | null = null;
+      if (data?.imageUrl) {
+        finalImageUrl = data.imageUrl as string;
+      } else if (data?.pending && data?.request_id) {
+        finalImageUrl = await pollImageResult(
+          data.model as string,
+          data.request_id as string,
+          data.status_url as string | undefined,
+          data.response_url as string | undefined,
+          data.save_opts as Record<string, unknown> | undefined,
+        );
+      }
+      if (error || !finalImageUrl) {
         throw new Error(data?.error ?? error?.message ?? '이미지 생성에 실패했습니다.');
       }
 
-      setGeneratedPreview(data.imageUrl);
+      setGeneratedPreview(finalImageUrl);
     } catch (err) {
       const msg = err instanceof Error ? err.message : '알 수 없는 오류가 발생했습니다.';
       setGenError(msg);
@@ -295,11 +309,24 @@ export default function CustomCharacterModal({ onClose, onGenerate }: CustomChar
         },
       });
 
-      if (error || !data?.imageUrl) {
+      // pending 응답 폴링 (PR #40 / Cycle 28 패턴)
+      let finalImageUrl: string | null = null;
+      if (data?.imageUrl) {
+        finalImageUrl = data.imageUrl as string;
+      } else if (data?.pending && data?.request_id) {
+        finalImageUrl = await pollImageResult(
+          data.model as string,
+          data.request_id as string,
+          data.status_url as string | undefined,
+          data.response_url as string | undefined,
+          data.save_opts as Record<string, unknown> | undefined,
+        );
+      }
+      if (error || !finalImageUrl) {
         throw new Error(data?.error ?? error?.message ?? '이미지 생성에 실패했습니다.');
       }
 
-      setGeneratedPreview(data.imageUrl);
+      setGeneratedPreview(finalImageUrl);
     } catch (err) {
       const msg = err instanceof Error ? err.message : '알 수 없는 오류가 발생했습니다.';
       setGenError(msg);
